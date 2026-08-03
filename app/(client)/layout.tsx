@@ -3,10 +3,10 @@ import { User, CalendarClock, Heart, Clock3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/client/profil", label: "Profil", icon: User },
-  { href: "/client/reservations", label: "Réservations", icon: CalendarClock },
-  { href: "/client/favoris", label: "Favoris", icon: Heart },
-  { href: "/client/historique", label: "Historique", icon: Clock3 },
+  { href: "/profil", label: "Profil", icon: User },
+  { href: "/reservations", label: "Réservations", icon: CalendarClock },
+  { href: "/favoris", label: "Favoris", icon: Heart },
+  { href: "/historique", label: "Historique", icon: Clock3 },
 ];
 
 export default function ClientLayout({

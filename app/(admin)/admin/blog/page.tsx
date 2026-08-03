@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
+import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+
+// Route /admin/blog — protégée, rôle ADMIN.
+export const metadata: Metadata = { title: "Gestion du blog" };
+
 export default function Page() {
   return (
-    <div className="text-sm text-gray-500">
-      Page : Blog
-    </div>
+    <PagePlaceholder
+      title="Gestion du blog"
+      description="Création, édition, publication et dépublication des articles du blog."
+    />
   );
 }

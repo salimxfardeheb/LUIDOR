@@ -4,16 +4,15 @@ import {
   LayoutGrid,
   CalendarDays,
   CalendarCheck,
-  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/ui/Logo";
 
 const navItems = [
   { href: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/owner/salles", label: "Salles", icon: LayoutGrid },
   { href: "/owner/disponibilites", label: "Disponibilités", icon: CalendarDays },
   { href: "/owner/reservations", label: "Réservations", icon: CalendarCheck },
-  { href: "/owner/kpi", label: "KPI", icon: BarChart3 },
 ];
 
 export default function OwnerLayout({
@@ -22,6 +21,9 @@ export default function OwnerLayout({
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-60 shrink-0 border-r border-gray-200 bg-white p-4 md:block">
+        <Link href="/" aria-label="Accueil LIUDOR" className="mb-6 block px-3">
+          <Logo size="sm" />
+        </Link>
         <span className="mb-6 block px-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
           Espace propriétaire
         </span>

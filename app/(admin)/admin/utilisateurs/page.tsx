@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
+import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+
+// Route /admin/utilisateurs — protégée, rôle ADMIN.
+export const metadata: Metadata = { title: "Utilisateurs" };
+
 export default function Page() {
   return (
-    <div className="text-sm text-gray-500">
-      Page : Utilisateurs
-    </div>
+    <PagePlaceholder
+      title="Utilisateurs"
+      description="Gestion des comptes : recherche, consultation, changement de rôle et désactivation."
+    />
   );
 }

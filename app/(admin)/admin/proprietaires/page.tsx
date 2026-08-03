@@ -1,7 +1,14 @@
+import type { Metadata } from "next";
+import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+
+// Route /admin/proprietaires — protégée, rôle ADMIN.
+export const metadata: Metadata = { title: "Propriétaires" };
+
 export default function Page() {
   return (
-    <div className="text-sm text-gray-500">
-      Page : Propriétaires
-    </div>
+    <PagePlaceholder
+      title="Propriétaires"
+      description="Gestion des comptes OWNER : salles rattachées, volume de réservations et statut du compte."
+    />
   );
 }
