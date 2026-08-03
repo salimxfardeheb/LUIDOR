@@ -13,12 +13,17 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
+        /** Action principale de la charte : or plein, texte blanc. */
         primary:
-          "bg-primary-900 text-white shadow-md hover:bg-primary-700 hover:shadow-lg",
+          "bg-secondary text-white shadow-sm hover:bg-secondary-400 hover:shadow-md",
+        /** Action secondaire pleine, sur fond clair (bleu marine). */
         secondary:
-          "bg-secondary text-primary-900 shadow-sm hover:bg-secondary-400",
+          "bg-primary-900 text-white shadow-sm hover:bg-primary-700 hover:shadow-md",
         outline:
           "border border-gray-300 bg-transparent text-gray-900 shadow-xs hover:bg-gray-100",
+        /** Outline blanc, pour les fonds marine (navbar, hero). */
+        "outline-light":
+          "border border-white/70 bg-transparent text-white hover:bg-white/10",
         ghost: "bg-transparent text-gray-700 hover:bg-gray-100",
         danger: "bg-error text-white shadow-sm hover:opacity-90",
       },

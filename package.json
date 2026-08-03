@@ -10,7 +10,7 @@
     "format": "prettier --write .",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed/index.ts"
   },
   "dependencies": {
     "@next-auth/prisma-adapter": "^1.0.7",
@@ -37,6 +37,10 @@
     "prettier": "^3.9.6",
     "prisma": "^6.19.3",
     "tailwindcss": "^3.4.1",
+    "tsx": "^4.23.5",
     "typescript": "^5"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed/index.ts"
   }
 }
