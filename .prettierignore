@@ -1,0 +1,6 @@
+app/
+components/
+lib/
+actions/
+prisma/
+public/
