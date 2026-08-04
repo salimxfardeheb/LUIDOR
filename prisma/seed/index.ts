@@ -16,6 +16,20 @@ const CATEGORIES = [
   { name: "Événement pro", iconSlug: "landmark" },
 ];
 
+/** Équipements proposés en cases à cocher par le panneau de filtres. */
+const EQUIPMENTS = [
+  "Climatisation",
+  "Parking privé",
+  "Sonorisation",
+  "Éclairage scénique",
+  "Cuisine équipée",
+  "Espace enfants",
+  "Wifi",
+  "Vidéoprojecteur",
+  "Terrasse",
+  "Accès PMR",
+];
+
 const OWNERS = [
   { email: "proprietaire1@liudor.dz", fullName: "Yacine Boumediene" },
   { email: "proprietaire2@liudor.dz", fullName: "Nadia Cherif" },
@@ -43,6 +57,8 @@ interface RoomSeed {
   basePrice: number;
   /** Notes des avis créés pour cette salle (1 à 5). */
   ratings: number[];
+  /** Équipements de la salle, à choisir dans `EQUIPMENTS`. */
+  equipments: string[];
 }
 
 const ROOMS: RoomSeed[] = [
@@ -55,6 +71,14 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 600,
     basePrice: 320000,
     ratings: [5, 5, 5, 4],
+    equipments: [
+      "Climatisation",
+      "Parking privé",
+      "Sonorisation",
+      "Éclairage scénique",
+      "Cuisine équipée",
+      "Accès PMR",
+    ],
   },
   {
     name: "Salle Les Jardins d'Or",
@@ -65,6 +89,14 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 400,
     basePrice: 240000,
     ratings: [5, 4, 5],
+    equipments: [
+      "Climatisation",
+      "Parking privé",
+      "Sonorisation",
+      "Cuisine équipée",
+      "Terrasse",
+      "Espace enfants",
+    ],
   },
   {
     name: "Espace Andalous",
@@ -75,6 +107,13 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 500,
     basePrice: 280000,
     ratings: [5, 4, 4, 5],
+    equipments: [
+      "Climatisation",
+      "Sonorisation",
+      "Éclairage scénique",
+      "Terrasse",
+      "Wifi",
+    ],
   },
   {
     name: "Le Grand Salon Rym",
@@ -85,6 +124,7 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 250,
     basePrice: 165000,
     ratings: [4, 4, 5],
+    equipments: ["Climatisation", "Sonorisation", "Parking privé", "Wifi"],
   },
   {
     name: "Résidence Sirta",
@@ -95,6 +135,7 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 200,
     basePrice: 130000,
     ratings: [4, 5],
+    equipments: ["Climatisation", "Sonorisation", "Terrasse", "Espace enfants"],
   },
   {
     name: "Centre de Congrès Numidia",
@@ -105,6 +146,14 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 800,
     basePrice: 410000,
     ratings: [5, 4],
+    equipments: [
+      "Climatisation",
+      "Wifi",
+      "Vidéoprojecteur",
+      "Sonorisation",
+      "Parking privé",
+      "Accès PMR",
+    ],
   },
   {
     name: "Villa Corail",
@@ -115,6 +164,7 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 150,
     basePrice: 95000,
     ratings: [4, 4],
+    equipments: ["Terrasse", "Espace enfants", "Sonorisation", "Wifi"],
   },
   {
     name: "Salle Ain Fouara",
@@ -125,6 +175,7 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 180,
     basePrice: 110000,
     ratings: [4],
+    equipments: ["Climatisation", "Cuisine équipée", "Parking privé"],
   },
   {
     name: "Espace Atlas Business",
@@ -135,6 +186,13 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 350,
     basePrice: 260000,
     ratings: [3, 4],
+    equipments: [
+      "Climatisation",
+      "Wifi",
+      "Vidéoprojecteur",
+      "Parking privé",
+      "Accès PMR",
+    ],
   },
   {
     name: "Le Patio Bleu",
@@ -145,6 +203,7 @@ const ROOMS: RoomSeed[] = [
     capacityMax: 120,
     basePrice: 85000,
     ratings: [],
+    equipments: ["Wifi", "Vidéoprojecteur", "Climatisation"],
   },
 ];
 
@@ -167,6 +226,16 @@ async function main() {
       create: category,
     });
     categories.set(created.name, created.id);
+  }
+
+  const equipments = new Map<string, string>();
+  for (const name of EQUIPMENTS) {
+    const created = await prisma.equipment.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+    });
+    equipments.set(created.name, created.id);
   }
 
   const owners = await Promise.all(
@@ -205,6 +274,13 @@ async function main() {
       status: "ACTIVE",
       owner: { connect: { id: owners[index % owners.length].id } },
       category: { connect: { id: categoryId } },
+      equipments: {
+        create: room.equipments.map((name) => {
+          const equipmentId = equipments.get(name);
+          if (!equipmentId) throw new Error(`Équipement inconnu : ${name}`);
+          return { equipment: { connect: { id: equipmentId } } };
+        }),
+      },
     };
 
     // Pas de contrainte unique sur `name` : on repart d'une base propre pour
@@ -230,7 +306,7 @@ async function main() {
   }
 
   console.log(
-    `Seed terminé : ${CATEGORIES.length} catégories, ${ROOMS.length} salles, ${owners.length + clients.length} comptes de démonstration.`
+    `Seed terminé : ${CATEGORIES.length} catégories, ${EQUIPMENTS.length} équipements, ${ROOMS.length} salles, ${owners.length + clients.length} comptes de démonstration.`
   );
 }
 

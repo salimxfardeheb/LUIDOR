@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { RoomCard } from "@/components/rooms/RoomCard";
-import type { RoomSummary } from "@/lib/home/queries";
+import type { RoomSummary } from "@/lib/rooms/types";
 import { cn } from "@/lib/utils";
 
 const PER_PAGE = 4;

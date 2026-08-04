@@ -3,7 +3,7 @@ import Link from "next/link";
 import { MapPin, Star, Users } from "lucide-react";
 import { FavoriteButton } from "@/components/rooms/FavoriteButton";
 import { PhotoFallback } from "@/components/ui/PhotoFallback";
-import type { RoomSummary } from "@/lib/home/queries";
+import type { RoomSummary } from "@/lib/rooms/types";
 import { formatCapacity, formatPrice, formatRating } from "@/lib/format";
 
 /** Carte salle : photo + overlays, nom, ville, capacité et prix d'appel. */

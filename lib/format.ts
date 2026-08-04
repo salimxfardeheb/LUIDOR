@@ -23,6 +23,22 @@ export function formatRating(value: number): string {
   });
 }
 
+const dateFormatter = new Intl.DateTimeFormat("fr-DZ", {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+  // Les dates d'événement sont stockées en `@db.Date` (minuit UTC) : formater
+  // en UTC évite de basculer sur la veille selon le fuseau du visiteur.
+  timeZone: "UTC",
+});
+
+/** Date d'événement : « 12 juin 2026 ». Accepte une chaîne `YYYY-MM-DD`. */
+export function formatDate(value: string | Date): string {
+  const date =
+    typeof value === "string" ? new Date(`${value}T00:00:00.000Z`) : value;
+  return dateFormatter.format(date);
+}
+
 /** Fourchette de capacité : « 150 – 400 invités ». */
 export function formatCapacity(min: number, max: number): string {
   return min === max

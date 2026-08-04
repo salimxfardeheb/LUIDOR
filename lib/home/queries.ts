@@ -1,27 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import { DESTINATIONS } from "@/lib/home/content";
+import {
+  ROOM_SUMMARY_SELECT,
+  toRoomSummary,
+  type RoomSummary,
+} from "@/lib/rooms/types";
 
 /** Nombre de salles affichées dans la section « Salles populaires ». */
 export const POPULAR_ROOMS_COUNT = 8;
-
-/**
- * Salle telle que consommée par l'UI : uniquement des types sérialisables,
- * pour pouvoir traverser la frontière serveur → composant client
- * (`Decimal` de Prisma ne l'est pas).
- */
-export interface RoomSummary {
-  id: string;
-  name: string;
-  city: string;
-  categoryName: string;
-  capacityMin: number;
-  capacityMax: number;
-  basePrice: number;
-  /** Moyenne des avis, ou `null` si la salle n'a encore aucun avis. */
-  rating: number | null;
-  reviewCount: number;
-  photoUrl: string | null;
-}
 
 /**
  * Les 8 salles ACTIVE les mieux notées.
@@ -37,37 +23,11 @@ export async function getPopularRooms(
 ): Promise<RoomSummary[]> {
   const rooms = await prisma.room.findMany({
     where: { status: "ACTIVE" },
-    select: {
-      id: true,
-      name: true,
-      city: true,
-      capacityMin: true,
-      capacityMax: true,
-      basePrice: true,
-      category: { select: { name: true } },
-      photos: { select: { url: true }, orderBy: { position: "asc" }, take: 1 },
-      reviews: { select: { rating: true } },
-    },
+    select: ROOM_SUMMARY_SELECT,
   });
 
   return rooms
-    .map((room): RoomSummary => {
-      const reviewCount = room.reviews.length;
-      const total = room.reviews.reduce((sum, r) => sum + r.rating, 0);
-
-      return {
-        id: room.id,
-        name: room.name,
-        city: room.city,
-        categoryName: room.category.name,
-        capacityMin: room.capacityMin,
-        capacityMax: room.capacityMax,
-        basePrice: Number(room.basePrice),
-        rating: reviewCount > 0 ? total / reviewCount : null,
-        reviewCount,
-        photoUrl: room.photos[0]?.url ?? null,
-      };
-    })
+    .map(toRoomSummary)
     .sort(
       (a, b) =>
         (b.rating ?? -1) - (a.rating ?? -1) || b.reviewCount - a.reviewCount

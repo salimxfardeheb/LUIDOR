@@ -12,14 +12,33 @@ import { Select } from "@/components/ui/Select";
 import { EVENT_TYPES } from "@/lib/home/content";
 import { cn } from "@/lib/utils";
 
+/** Valeurs de préremplissage, reprises des query params sur /salles/resultats. */
+export interface SearchCardValues {
+  ville?: string | null;
+  date?: string | null;
+  invites?: number | null;
+  type?: string | null;
+}
+
 /**
  * Barre de recherche du hero.
  *
  * Formulaire GET natif vers /salles/resultats : les critères arrivent en query
  * params (`ville`, `date`, `invites`, `type`) et la recherche fonctionne même
  * sans JavaScript.
+ *
+ * Réutilisée telle quelle en haut de la page de résultats : `values` y réinjecte
+ * les critères de l'URL pour que la barre reflète la recherche en cours. Comme
+ * ce sont des champs non contrôlés, l'appelant doit passer une `key` dérivée de
+ * l'URL pour forcer le remontage quand les critères changent.
  */
-export function SearchCard({ className }: { className?: string }) {
+export function SearchCard({
+  className,
+  values,
+}: {
+  className?: string;
+  values?: SearchCardValues;
+}) {
   return (
     <form
       action="/salles/resultats"
@@ -42,12 +61,19 @@ export function SearchCard({ className }: { className?: string }) {
             type="text"
             placeholder="Ville ou quartier"
             autoComplete="address-level2"
+            defaultValue={values?.ville ?? ""}
             className="pl-9"
           />
         </Field>
 
         <Field id="date" label="Date de l'événement" icon={CalendarDays}>
-          <Input id="date" name="date" type="date" className="pl-9" />
+          <Input
+            id="date"
+            name="date"
+            type="date"
+            defaultValue={values?.date ?? ""}
+            className="pl-9"
+          />
         </Field>
 
         <Field id="invites" label="Invités" icon={Users}>
@@ -59,12 +85,18 @@ export function SearchCard({ className }: { className?: string }) {
             step={1}
             inputMode="numeric"
             placeholder="150"
+            defaultValue={values?.invites ?? ""}
             className="pl-9"
           />
         </Field>
 
         <Field id="type" label="Type d'événement" icon={PartyPopper}>
-          <Select id="type" name="type" defaultValue="" className="pl-9">
+          <Select
+            id="type"
+            name="type"
+            defaultValue={values?.type ?? ""}
+            className="pl-9"
+          >
             <option value="">Tous les types</option>
             {EVENT_TYPES.map((type) => (
               <option key={type} value={type}>
