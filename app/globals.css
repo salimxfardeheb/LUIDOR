@@ -47,4 +47,20 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+
+  /*
+   * Hauteur minimale d'un écran, fiable sur mobile.
+   *
+   * `100vh` correspond au viewport *sans* les barres du navigateur : sur iOS et
+   * Android, une page courte dépasse donc de la hauteur de ces barres et hérite
+   * d'un défilement fantôme de 60 à 100 px. `100dvh` suit la zone réellement
+   * visible et corrige le problème.
+   *
+   * Les deux déclarations sont conservées dans cet ordre : les navigateurs qui
+   * ignorent `dvh` (Safari < 15.4, Chrome < 108) gardent le repli `100vh`.
+   */
+  .min-h-screen-safe {
+    min-height: 100vh;
+    min-height: 100dvh;
+  }
 }

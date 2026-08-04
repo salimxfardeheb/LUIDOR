@@ -56,8 +56,10 @@ function buildWhere(filters: RoomFilters): Prisma.RoomWhereInput {
     conditions.push({ city: { contains: filters.ville, mode: "insensitive" } });
   }
 
+  // Rattachement, et non catégorie principale : une salle proposée pour
+  // plusieurs types d'événement doit ressortir sur chacun d'eux.
   if (filters.type) {
-    conditions.push({ category: { name: filters.type } });
+    conditions.push({ categories: { some: { category: { name: filters.type } } } });
   }
 
   // Nombre d'invités : la fourchette de la salle doit l'englober.
@@ -226,7 +228,10 @@ export async function getCatalogRooms(
   perPage: number = ROOMS_PER_PAGE
 ): Promise<RoomsPage> {
   const where: Prisma.RoomWhereInput = categoryName
-    ? { status: "ACTIVE", category: { name: categoryName } }
+    ? {
+        status: "ACTIVE",
+        categories: { some: { category: { name: categoryName } } },
+      }
     : { status: "ACTIVE" };
 
   return findPage(where, ORDER_BY.pertinence, page, perPage);

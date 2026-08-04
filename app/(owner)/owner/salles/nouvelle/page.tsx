@@ -1,14 +1,41 @@
 import type { Metadata } from "next";
-import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+import Link from "next/link";
+import { ChevronLeft } from "lucide-react";
+import { RoomForm } from "@/components/owner/RoomForm";
+import { getRoomFormOptions } from "@/lib/owner/rooms";
 
 // Route /owner/salles/nouvelle — protégée, rôle OWNER.
 export const metadata: Metadata = { title: "Ajouter une salle" };
 
-export default function Page() {
+export default async function Page() {
+  // Aucune donnée propre au propriétaire ici : le formulaire ne dépend que des
+  // référentiels. La propriété est établie par l'action serveur, à partir de la
+  // session — jamais d'un champ du formulaire.
+  const options = await getRoomFormOptions();
+
   return (
-    <PagePlaceholder
-      title="Ajouter une salle"
-      description="Formulaire de création d'une salle : description, localisation, capacité, tarif, photos, équipements et services."
-    />
+    <div className="mx-auto max-w-3xl">
+      <Link
+        href="/owner/salles"
+        className="inline-flex items-center gap-1.5 rounded-md text-sm font-medium text-gray-500 transition-colors hover:text-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2"
+      >
+        <ChevronLeft aria-hidden className="h-4 w-4" />
+        Mes salles
+      </Link>
+
+      <header className="mt-4">
+        <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+          Ajouter une salle
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Renseignez les informations de votre salle. Vous pourrez les modifier à
+          tout moment, y compris après sa mise en ligne.
+        </p>
+      </header>
+
+      <div className="mt-6">
+        <RoomForm options={options} />
+      </div>
+    </div>
   );
 }

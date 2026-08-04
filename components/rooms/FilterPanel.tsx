@@ -212,7 +212,6 @@ export function FilterPanel({
             label="Min. (DA)"
             placeholder="80 000"
             defaultValue={filters.prixMin}
-            step={1000}
           />
           <RangeField
             id="filtre-prix-max"
@@ -220,7 +219,6 @@ export function FilterPanel({
             label="Max. (DA)"
             placeholder="400 000"
             defaultValue={filters.prixMax}
-            step={1000}
           />
         </div>
         <p className="mt-2 text-xs text-gray-500">
@@ -301,14 +299,12 @@ function RangeField({
   label,
   placeholder,
   defaultValue,
-  step = 1,
 }: {
   id: string;
   name: string;
   label: string;
   placeholder: string;
   defaultValue: number | null;
-  step?: number;
 }) {
   return (
     <div>
@@ -323,7 +319,12 @@ function RangeField({
         name={name}
         type="number"
         min={1}
-        step={step}
+        /*
+         * Pas de 1 obligatoire : le navigateur n'accepte une valeur que si
+         * (valeur − min) est un multiple du pas. Un pas de 1000 avec min=1
+         * faisait rejeter 80000 ou 240000 par la validation native.
+         */
+        step={1}
         inputMode="numeric"
         placeholder={placeholder}
         defaultValue={defaultValue ?? ""}

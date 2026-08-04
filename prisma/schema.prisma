@@ -121,9 +121,31 @@ model Category {
   name     String @unique
   iconSlug String
 
+  /// Salles dont c'est la catégorie principale (`Room.categoryId`).
   rooms Room[]
+  /// Toutes les salles rattachées à cette catégorie, principale ou secondaire.
+  roomLinks RoomCategory[]
 
   @@map("categories")
+}
+
+/// Rattachement d'une salle à une catégorie.
+///
+/// Une salle peut servir plusieurs types d'événement (mariage *et* fiançailles,
+/// par exemple). Invariant maintenu par les actions et le seed : la catégorie
+/// principale (`Room.categoryId`) figure toujours dans cette table. Les filtres
+/// du catalogue et de la recherche s'appuient donc uniquement sur elle, tandis
+/// que `Room.categoryId` ne sert qu'à savoir laquelle afficher en premier.
+model RoomCategory {
+  roomId     String
+  categoryId String
+
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([roomId, categoryId])
+  @@index([categoryId])
+  @@map("room_categories")
 }
 
 model Room {
@@ -178,7 +200,10 @@ model Room {
   updatedAt    DateTime   @updatedAt
 
   owner      User         @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Catégorie principale : celle affichée sur les cartes et la fiche.
   category   Category     @relation(fields: [categoryId], references: [id])
+  /// Toutes les catégories de la salle, principale incluse (voir `RoomCategory`).
+  categories RoomCategory[]
   photos     Photo[]
   availabilities Availability[]
   bookings   Booking[]
@@ -196,6 +221,9 @@ model Photo {
   id       String @id @default(cuid())
   roomId   String
   url      String
+  /// Identifiant Cloudinary (`public_id`), requis pour supprimer l'asset.
+  /// Null pour une photo qui ne vient pas de Cloudinary (import, seed).
+  publicId String?
   position Int    @default(0)
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)

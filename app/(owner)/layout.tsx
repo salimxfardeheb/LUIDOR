@@ -19,7 +19,7 @@ export default function OwnerLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen-safe">
       <aside className="hidden w-60 shrink-0 border-r border-gray-200 bg-white p-4 md:block">
         <Link href="/" aria-label="Accueil LIUDOR" className="mb-6 block px-3">
           <Logo size="sm" />

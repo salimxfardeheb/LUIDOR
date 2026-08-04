@@ -13,7 +13,7 @@ export default function ClientLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="mx-auto flex min-h-screen max-w-7xl gap-8 px-4 py-8 sm:px-6">
+    <div className="mx-auto flex min-h-screen-safe max-w-7xl gap-8 px-4 py-8 sm:px-6">
       <aside className="hidden w-56 shrink-0 md:block">
         <nav className="sticky top-8 flex flex-col gap-1">
           {navItems.map(({ href, label, icon: Icon }) => (

@@ -29,7 +29,7 @@ export default function AdminLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen-safe">
       <aside className="flex w-60 shrink-0 flex-col border-r border-gray-200 bg-primary-900 p-4 text-white md:flex">
         <Link href="/" aria-label="Accueil LIUDOR" className="px-3 py-2">
           <Logo size="sm" onDark />

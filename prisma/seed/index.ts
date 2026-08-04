@@ -493,6 +493,9 @@ async function main() {
       status: "ACTIVE",
       owner: { connect: { id: owners[index % owners.length].id } },
       category: { connect: { id: categoryId } },
+      // La catégorie principale figure toujours dans `room_categories` : c'est
+      // sur cette table que reposent les filtres du catalogue et de la recherche.
+      categories: { create: [{ category: { connect: { id: categoryId } } }] },
       equipments: {
         create: room.equipments.map((name) => {
           const equipmentId = equipments.get(name);

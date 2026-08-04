@@ -252,7 +252,8 @@ export async function getSimilarRooms(
     where: {
       status: "ACTIVE",
       id: { not: room.id },
-      category: { name: room.categoryName },
+      // Au moins une catégorie en commun, principale ou secondaire.
+      categories: { some: { category: { name: room.categoryName } } },
     },
     select: ROOM_SUMMARY_SELECT,
     orderBy: { createdAt: "desc" },

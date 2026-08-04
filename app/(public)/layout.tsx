@@ -1,11 +1,15 @@
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 
+/**
+ * `min-h-screen-safe` garantit qu'une page courte occupe tout l'écran, sur
+ * mobile comme sur desktop ; `flex-1` sur le `<main>` pousse le footer en bas.
+ */
 export default function PublicLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="flex min-h-screen-safe flex-col bg-white">
       <a
         href="#contenu"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-primary-900 focus:shadow-lg"
