@@ -43,9 +43,10 @@ export function RoomGallery({
 
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-[2fr_1fr] sm:grid-rows-3">
-        {/* Photo principale */}
-        <div className="relative overflow-hidden rounded-lg bg-primary-900 sm:row-span-3">
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        {/* Photo principale : son format 4/3 ancre la hauteur de la ligne à
+            toutes les tailles d'écran ; les vignettes s'ajustent dessus. */}
+        <div className="relative overflow-hidden rounded-lg bg-primary-900">
           <button
             type="button"
             onClick={() => setGalleryOpen(true)}
@@ -54,7 +55,7 @@ export function RoomGallery({
                 ? `Voir les ${photos.length} photos de ${roomName}`
                 : `Photos de ${roomName}`
             }
-            className="group relative block aspect-[4/3] w-full sm:aspect-auto sm:h-full"
+            className="group relative block aspect-[4/3] w-full"
           >
             {mainPhoto ? (
               <Image
