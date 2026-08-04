@@ -39,6 +39,17 @@ export function formatDate(value: string | Date): string {
   return dateFormatter.format(date);
 }
 
+const monthYearFormatter = new Intl.DateTimeFormat("fr-DZ", {
+  month: "long",
+  year: "numeric",
+  timeZone: "UTC",
+});
+
+/** Mois et année : « juin 2026 ». */
+export function formatMonthYear(value: Date): string {
+  return monthYearFormatter.format(value);
+}
+
 /** Fourchette de capacité : « 150 – 400 invités ». */
 export function formatCapacity(min: number, max: number): string {
   return min === max

@@ -50,6 +50,11 @@ model User {
   avatarUrl    String?
   role         UserRole  @default(CLIENT)
   emailVerified DateTime?
+  /// Langues parlées, affichées sur la carte propriétaire d'une fiche salle.
+  languages    String[]  @default([])
+  /// Délai de réponse moyen en heures. Saisi par l'équipe tant que la
+  /// messagerie interne n'existe pas pour le calculer.
+  responseTimeHours Int?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
@@ -128,6 +133,8 @@ model Room {
   name         String
   description  String     @db.Text
   city         String
+  /// Quartier, affiché dans le fil d'Ariane de la fiche salle.
+  district     String?
   address      String
   latitude     Float?
   longitude    Float?
@@ -135,6 +142,38 @@ model Room {
   capacityMax  Int
   basePrice    Decimal    @db.Decimal(10, 2)
   status       RoomStatus @default(PENDING)
+
+  // --- Caractéristiques affichées sur la fiche salle -----------------------
+  // Toutes facultatives : une salle publiée avant l'ajout de ces champs reste
+  // valide, et la fiche masque simplement les lignes non renseignées.
+
+  /// Superficie en m².
+  surfaceM2    Int?
+  /// Nombre d'espaces distincts (grande salle, mezzanine, jardin…).
+  spacesCount  Int?
+  hasParking   Boolean    @default(false)
+  hasAccommodation Boolean @default(false)
+  /// Renseigné par l'équipe LIUDOR après vérification : sert de badge « vérifié ».
+  verifiedAt   DateTime?
+  /// Visite vidéo, mise en avant par une vignette « play » dans la galerie.
+  videoUrl     String?
+
+  // --- Informations pratiques ---------------------------------------------
+
+  /// Plage horaire d'utilisation, ex. « 08:00 – 02:00 ».
+  openingHours String?
+  /// Règles de sonorisation, ex. « Sonorisation autorisée jusqu'à 2h ».
+  musicPolicy  String?
+  /// Libellé court de la politique d'annulation, ex. « Flexible ».
+  cancellationPolicy String?
+  /// Conditions complètes, affichées dans la modale ouverte depuis la fiche.
+  cancellationTerms  String? @db.Text
+  /// Caution demandée à la réservation.
+  depositAmount Decimal?  @db.Decimal(10, 2)
+  cleaningFee   Decimal?  @db.Decimal(10, 2)
+  petsAllowed   Boolean   @default(false)
+  wheelchairAccess Boolean @default(false)
+
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
@@ -264,6 +303,8 @@ model Review {
   clientId String
   rating   Int
   comment  String   @db.Text
+  /// Photo jointe à l'avis, affichée en vignette sous le commentaire.
+  photoUrl String?
   createdAt DateTime @default(now())
 
   room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -285,4 +326,22 @@ model BlogPost {
   updatedAt    DateTime @updatedAt
 
   @@map("blog_posts")
+}
+
+/// Message envoyé depuis le formulaire /contact. L'équipe LIUDOR le lit dans
+/// l'administration (/admin/messages) ; un exemplaire part aussi par email.
+model ContactMessage {
+  id        String    @id @default(cuid())
+  fullName  String
+  email     String
+  subject   String
+  /// Contenu du message, en clair.
+  message   String    @db.Text
+  /// Renseigné quand un administrateur marque le message comme traité.
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([readAt])
+  @@index([createdAt])
+  @@map("contact_messages")
 }

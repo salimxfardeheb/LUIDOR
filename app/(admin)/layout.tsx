@@ -8,6 +8,7 @@ import {
   Star,
   PenLine,
   Settings,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
@@ -19,6 +20,7 @@ const navItems = [
   { href: "/admin/proprietaires", label: "Propriétaires", icon: Store },
   { href: "/admin/reservations", label: "Réservations", icon: CalendarCheck },
   { href: "/admin/avis", label: "Avis", icon: Star },
+  { href: "/admin/messages", label: "Messages", icon: Mail },
   { href: "/admin/blog", label: "Blog", icon: PenLine },
   { href: "/admin/parametres", label: "Paramètres", icon: Settings },
 ];
