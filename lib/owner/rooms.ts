@@ -69,6 +69,30 @@ export async function listOwnerRooms(
   }));
 }
 
+/** Salle telle qu'elle apparaît dans un sélecteur (calendrier, filtres). */
+export interface OwnerRoomOption {
+  id: string;
+  name: string;
+  city: string;
+  status: RoomStatus;
+}
+
+/**
+ * Salles du propriétaire, par ordre alphabétique, pour les sélecteurs.
+ *
+ * Toutes les salles sont proposées, y compris celles en attente de validation :
+ * un propriétaire prépare ses disponibilités avant la mise en ligne.
+ */
+export async function listOwnerRoomOptions(
+  ownerId: string
+): Promise<OwnerRoomOption[]> {
+  return prisma.room.findMany({
+    where: { ownerId },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, city: true, status: true },
+  });
+}
+
 export interface RoomFormOptions {
   categories: { id: string; name: string }[];
   equipments: { id: string; name: string }[];

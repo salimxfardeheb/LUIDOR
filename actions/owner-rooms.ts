@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { RoomStatus } from "@prisma/client";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { requireOwnerSession } from "@/lib/owner/guards";
 import {
   parsePhotoFiles,
   parseRoomForm,
@@ -46,35 +46,17 @@ export type RoomFormState = Extract<RoomActionResult, { ok: false }> | null;
 
 const OWNER_ROOMS_PATH = "/owner/salles";
 
-/** Session propriétaire, ou refus typé. */
+/** Session propriétaire, ou refus typé — voir `lib/owner/guards`. */
 async function requireOwner(): Promise<
   { ok: true; ownerId: string } | { ok: false; result: RoomActionResult }
 > {
-  const session = await auth();
+  const session = await requireOwnerSession();
 
-  if (!session?.user?.id) {
-    return {
-      ok: false,
-      result: {
-        ok: false,
-        status: 401,
-        message: "Votre session a expiré. Reconnectez-vous pour continuer.",
-      },
-    };
+  if (!session.ok) {
+    return { ok: false, result: { ok: false, ...session.refusal } };
   }
 
-  if (session.user.role !== "OWNER") {
-    return {
-      ok: false,
-      result: {
-        ok: false,
-        status: 403,
-        message: "Seuls les comptes propriétaire peuvent gérer des salles.",
-      },
-    };
-  }
-
-  return { ok: true, ownerId: session.user.id };
+  return { ok: true, ownerId: session.ownerId };
 }
 
 /** Vérifie que la salle appartient bien au propriétaire connecté. */

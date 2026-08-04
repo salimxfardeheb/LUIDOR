@@ -1,5 +1,6 @@
 import type { BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { bookingAmount } from "@/lib/owner/bookings";
 
 /**
  * Données du tableau de bord propriétaire, limitées aux salles dont il est
@@ -64,21 +65,6 @@ function lastMonths(count: number): Array<{ key: string; label: string }> {
     });
   }
   return result;
-}
-
-/**
- * Montant d'une réservation : le paiement réel quand il existe, sinon une
- * estimation au prix d'appel de la salle + frais de ménage. `Booking` ne
- * porte pas de prix propre : la copie en base sert tant que le paiement n'a
- * pas été enregistré.
- */
-function bookingAmount(
-  paidAmount: unknown,
-  basePrice: unknown,
-  cleaningFee: unknown
-): number {
-  if (paidAmount != null) return Number(paidAmount);
-  return Number(basePrice) + Number(cleaningFee ?? 0);
 }
 
 export async function getOwnerDashboard(

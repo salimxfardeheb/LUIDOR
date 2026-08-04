@@ -66,27 +66,29 @@ export default async function Page({ params }: PageProps) {
         roomName={room.name}
       />
 
-      <div className="mt-5">
-        <RoomGallery
-          roomName={room.name}
-          photos={room.photos}
-          videoUrl={room.videoUrl}
-        />
-      </div>
-
-      <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
+      {/* Galerie et sidebar partagent la même ligne : la carte de réservation
+          est visible sans défiler, alignée en haut de la photo principale. */}
+      <div className="mt-5 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
         {/* Colonne principale */}
         <div className="min-w-0">
-          <RoomHeader
-            name={room.name}
-            categoryName={room.categoryName}
-            verified={room.verified}
-            rating={room.rating}
-            reviewCount={room.reviewCount}
-            city={room.city}
-            district={room.district}
-            address={room.address}
+          <RoomGallery
+            roomName={room.name}
+            photos={room.photos}
+            videoUrl={room.videoUrl}
           />
+
+          <div className="mt-6">
+            <RoomHeader
+              name={room.name}
+              categoryName={room.categoryName}
+              verified={room.verified}
+              rating={room.rating}
+              reviewCount={room.reviewCount}
+              city={room.city}
+              district={room.district}
+              address={room.address}
+            />
+          </div>
 
           <div className="mt-6">
             <RoomStats
