@@ -1,7 +1,5 @@
-import Image from "next/image";
+import { HeroSlideshow } from "@/components/home/HeroSlideshow";
 import { SearchCard } from "@/components/home/SearchCard";
-import { PhotoFallback } from "@/components/ui/PhotoFallback";
-import { HERO_IMAGE } from "@/lib/home/content";
 
 /**
  * Hero pleine largeur. La carte de recherche déborde volontairement en bas du
@@ -11,18 +9,7 @@ export function Hero() {
   return (
     <section aria-labelledby="hero-titre" className="relative">
       <div className="relative isolate overflow-hidden bg-primary-900">
-        {HERO_IMAGE ? (
-          <Image
-            src={HERO_IMAGE}
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-        ) : (
-          <PhotoFallback />
-        )}
+        <HeroSlideshow />
         {/* Dégradé sombre : garantit le contraste du texte sur la photo. */}
         <div
           aria-hidden

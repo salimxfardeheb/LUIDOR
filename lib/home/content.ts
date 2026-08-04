@@ -55,11 +55,11 @@ export interface HomeDestination {
 }
 
 export const DESTINATIONS: readonly HomeDestination[] = [
-  { city: "Alger", image: null },
-  { city: "Oran", image: null },
-  { city: "Constantine", image: null },
-  { city: "Annaba", image: null },
-  { city: "Sétif", image: null },
+  { city: "Alger", image: "/wilayas/alger.jpg" },
+  { city: "Oran", image: "/wilayas/oran.jpg" },
+  { city: "Constantine", image: "/wilayas/constantine.jpg" },
+  { city: "Annaba", image: "/wilayas/annaba.jpg" },
+  { city: "Sétif", image: "/wilayas/setif.jpg" },
 ] as const;
 
 export interface HomeFeature {
@@ -145,9 +145,14 @@ export const TESTIMONIALS: readonly HomeTestimonial[] = [
 export const EVENT_TYPES: readonly string[] = CATEGORIES.map((c) => c.name);
 
 /**
- * Photo de fond du hero. Déposer le fichier dans /public (paysage 16/9,
- * ~1920 × 1080 px) puis renseigner son chemin ici — par exemple
- * `"/images/hero-salle.jpg"`. Tant que la valeur est `null`, le hero affiche
- * le dégradé de marque.
+ * Photos de fond du hero, jouées en diaporama dans cet ordre.
+ *
+ * Déposer les fichiers dans /public/hero (paysage, ~1920 × 1080 px suffisent :
+ * `next/image` réencode à la volée). Une seule entrée affiche une photo fixe,
+ * une liste vide retombe sur le dégradé de marque.
  */
-export const HERO_IMAGE: string | null = null;
+export const HERO_IMAGES: readonly string[] = [
+  "/hero/wedding.jpg",
+  "/hero/conference.jpg",
+  "/hero/conference2.jpg",
+] as const;

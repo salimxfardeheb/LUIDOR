@@ -42,7 +42,9 @@ export async function Destinations() {
         {destinations.map(({ city, image, roomCount }) => (
           <li key={city}>
             <Link
-              href={`/salles?ville=${encodeURIComponent(city)}`}
+              // Le catalogue ne filtre que par catégorie : une ville passe par
+              // la page de résultats, qui sait traiter le paramètre `ville`.
+              href={`/salles/resultats?ville=${encodeURIComponent(city)}`}
               className="group relative block aspect-[3/4] overflow-hidden rounded-lg shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2"
             >
               {image ? (
