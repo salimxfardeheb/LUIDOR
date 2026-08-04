@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
+import { FooterLinks } from "@/components/layout/FooterLinks";
 import { LogoMark } from "@/components/ui/Logo";
 
 /**
@@ -31,36 +32,6 @@ function LinkedinIcon({ className }: BrandIconProps) {
     </svg>
   );
 }
-
-const LINK_COLUMNS = [
-  {
-    title: "Découvrir",
-    links: [
-      { href: "/salles", label: "Toutes les salles" },
-      { href: "/salles?categorie=mariage", label: "Salles de mariage" },
-      { href: "/salles?ville=Alger", label: "Salles à Alger" },
-      { href: "/blog", label: "Blog & conseils" },
-    ],
-  },
-  {
-    title: "Propriétaires",
-    links: [
-      { href: "/owner/salles/nouvelle", label: "Publier une salle" },
-      { href: "/owner/dashboard", label: "Espace propriétaire" },
-      { href: "/owner/reservations", label: "Gérer mes réservations" },
-      { href: "/a-propos", label: "Comment ça marche" },
-    ],
-  },
-  {
-    title: "LIUDOR",
-    links: [
-      { href: "/a-propos", label: "À propos" },
-      { href: "/contact", label: "Nous contacter" },
-      { href: "/connexion", label: "Se connecter" },
-      { href: "/inscription", label: "Créer un compte" },
-    ],
-  },
-] as const;
 
 const SOCIAL_LINKS = [
   { href: "https://facebook.com", label: "Facebook", icon: FacebookIcon },
@@ -105,25 +76,7 @@ export function SiteFooter() {
             </ul>
           </div>
 
-          {LINK_COLUMNS.map((column) => (
-            <nav key={column.title} aria-label={column.title}>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">
-                {column.title}
-              </h2>
-              <ul className="mt-4 space-y-2.5">
-                {column.links.map((link) => (
-                  <li key={link.href + link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-gray-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary-900"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-          ))}
+          <FooterLinks />
 
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-[0.18em] text-secondary-400">

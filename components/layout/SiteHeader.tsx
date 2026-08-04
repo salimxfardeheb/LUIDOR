@@ -3,15 +3,26 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Heart, Menu, X } from "lucide-react";
 import { LogoMark } from "@/components/ui/Logo";
 import { HeaderAuth } from "@/components/layout/HeaderAuth";
+import type { Role } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
-const NAV_LINKS = [
+interface NavLink {
+  href: string;
+  label: string;
+  /** Rôle exigé pour voir le lien ; absent = visible par tout le monde. */
+  role?: Role;
+}
+
+const NAV_LINKS: readonly NavLink[] = [
   { href: "/", label: "Accueil" },
   { href: "/salles", label: "Explorer les salles" },
-  { href: "/owner/salles/nouvelle", label: "Publier une salle" },
+  // Réservé aux propriétaires : la route est de toute façon refusée aux autres
+  // rôles par le middleware, inutile de l'afficher aux visiteurs et aux clients.
+  { href: "/owner/salles/nouvelle", label: "Publier une salle", role: "OWNER" },
   { href: "/a-propos", label: "À propos" },
   { href: "/contact", label: "Contact" },
 ] as const;
@@ -19,7 +30,19 @@ const NAV_LINKS = [
 /** Barre de navigation publique : fond marine, fixée en haut de page. */
 export function SiteHeader() {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const [menuOpen, setMenuOpen] = React.useState(false);
+
+  /*
+   * Le rôle n'est connu qu'après récupération de la session côté client : tant
+   * qu'il est inconnu, les liens restreints restent masqués. Un visiteur non
+   * connecté ne voit donc jamais apparaître puis disparaître le lien.
+   */
+  const role = session?.user?.role;
+  const navLinks = React.useMemo(
+    () => NAV_LINKS.filter((link) => !link.role || link.role === role),
+    [role]
+  );
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -43,7 +66,7 @@ export function SiteHeader() {
 
         <nav aria-label="Navigation principale" className="hidden lg:block">
           <ul className="flex items-center gap-1">
-            {NAV_LINKS.map((link) => (
+            {navLinks.map((link) => (
               <li key={link.href}>
                 <Link
                   href={link.href}
@@ -100,7 +123,7 @@ export function SiteHeader() {
         >
           <nav aria-label="Navigation mobile" className="mx-auto max-w-7xl px-4 py-3 sm:px-6">
             <ul className="flex flex-col gap-1">
-              {NAV_LINKS.map((link) => (
+              {navLinks.map((link) => (
                 <li key={link.href}>
                   <Link
                     href={link.href}
