@@ -50,6 +50,16 @@ export function formatMonthYear(value: Date): string {
   return monthYearFormatter.format(value);
 }
 
+/** Initiales affichées à défaut d'avatar : « Amina Belkacem » → « AB ». */
+export function formatInitials(fullName: string): string {
+  return fullName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+}
+
 /** Fourchette de capacité : « 150 – 400 invités ». */
 export function formatCapacity(min: number, max: number): string {
   return min === max

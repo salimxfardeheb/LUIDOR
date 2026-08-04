@@ -1,6 +1,6 @@
-import type { PaymentStatus } from "@prisma/client";
 import { Mail, Phone } from "lucide-react";
 import { BookingStatusBadge } from "@/components/dashboard/BookingStatusBadge";
+import { paymentNote } from "@/lib/bookings/status";
 import { formatDate, formatNumber, formatPrice } from "@/lib/format";
 import type { OwnerBookingRow } from "@/lib/owner/bookings";
 
@@ -80,7 +80,7 @@ export function OwnerBookingsList({
                 <td className="whitespace-nowrap px-4 py-4 text-right font-semibold text-gray-900">
                   {formatPrice(booking.amount)}
                   <span className="mt-0.5 block text-xs font-normal text-gray-400">
-                    {paymentNote(booking)}
+                    {paymentNote(booking.paymentStatus)}
                   </span>
                 </td>
                 <td className="px-4 py-4">
@@ -138,7 +138,7 @@ function BookingCard({ booking }: { booking: OwnerBookingRow }) {
           <dd className="mt-0.5 font-semibold text-gray-900">
             {formatPrice(booking.amount)}
           </dd>
-          <dd className="text-xs text-gray-400">{paymentNote(booking)}</dd>
+          <dd className="text-xs text-gray-400">{paymentNote(booking.paymentStatus)}</dd>
         </div>
       </dl>
     </article>
@@ -171,17 +171,3 @@ function ContactLinks({ booking }: { booking: OwnerBookingRow }) {
   );
 }
 
-const PAYMENT_NOTE: Record<PaymentStatus, string> = {
-  PENDING: "paiement en attente",
-  PAID: "payé",
-  REFUNDED: "remboursé",
-};
-
-/**
- * Précision sous le montant. Sans paiement enregistré, le montant est une
- * estimation au tarif de la salle : le dire évite qu'il soit lu comme un dû.
- */
-function paymentNote(booking: OwnerBookingRow): string {
-  if (booking.paymentStatus === null) return "estimation";
-  return PAYMENT_NOTE[booking.paymentStatus];
-}

@@ -1,6 +1,7 @@
-import type { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
+import type { BookingStatus, PaymentStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { BookingFilters } from "@/lib/owner/bookings-params";
+import { bookingAmount } from "@/lib/bookings/amount";
 
 /**
  * Réservations reçues sur les salles du propriétaire.
@@ -30,21 +31,6 @@ export interface OwnerBookingRow {
   status: BookingStatus;
   /** Date de réception de la demande. */
   createdAt: Date;
-}
-
-/**
- * Montant d'une réservation : le paiement réel quand il existe, sinon une
- * estimation au prix d'appel de la salle + frais de ménage. `Booking` ne porte
- * pas de prix propre : la copie en base sert tant que le paiement n'a pas été
- * enregistré.
- */
-export function bookingAmount(
-  paidAmount: Prisma.Decimal | null | undefined,
-  basePrice: Prisma.Decimal,
-  cleaningFee: Prisma.Decimal | null
-): number {
-  if (paidAmount != null) return Number(paidAmount);
-  return Number(basePrice) + Number(cleaningFee ?? 0);
 }
 
 /**

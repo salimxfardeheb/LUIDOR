@@ -18,6 +18,9 @@ import { v2 as cloudinary } from "cloudinary";
 /** Dossier Cloudinary racine des photos de salles. */
 const ROOT_FOLDER = "liudor/rooms";
 
+/** Dossier des avatars de comptes. */
+const AVATAR_FOLDER = "liudor/avatars";
+
 export interface StoredPhoto {
   /** URL publique servie par Cloudinary (HTTPS). */
   url: string;
@@ -119,7 +122,7 @@ export async function saveRoomPhotos(
       uploaded.push(await uploadBuffer(buffer, `${ROOT_FOLDER}/${roomId}`));
     }
   } catch (error) {
-    await Promise.all(uploaded.map((photo) => deleteRoomPhoto(photo)));
+    await Promise.all(uploaded.map((photo) => deleteStoredPhoto(photo)));
     throw error;
   }
 
@@ -163,14 +166,31 @@ function uploadBuffer(buffer: Buffer, folder: string): Promise<StoredPhoto> {
 }
 
 /**
- * Supprime une photo.
+ * Envoie l'avatar d'un compte.
  *
- * Sans `publicId` (photo importée hors Cloudinary), il n'y a rien à supprimer
+ * Un seul fichier, dans un dossier par utilisateur : l'ancien avatar est
+ * supprimé par l'appelant une fois le nouveau enregistré, pour ne jamais
+ * laisser un compte sans image en cas d'échec de l'envoi.
+ */
+export async function saveUserAvatar(
+  userId: string,
+  file: File
+): Promise<StoredPhoto> {
+  if (!configure()) throw new StorageNotConfiguredError();
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return uploadBuffer(buffer, `${AVATAR_FOLDER}/${userId}`);
+}
+
+/**
+ * Supprime un fichier stocké (photo de salle, avatar).
+ *
+ * Sans `publicId` (fichier importé hors Cloudinary), il n'y a rien à supprimer
  * côté fournisseur : la ligne en base est retirée par l'appelant, on sort sans
  * erreur. Une suppression ne doit jamais faire échouer l'enregistrement du reste
  * du formulaire, donc les échecs sont journalisés et non propagés.
  */
-export async function deleteRoomPhoto(photo: {
+export async function deleteStoredPhoto(photo: {
   /** Null pour une photo qui ne provient pas de Cloudinary. */
   publicId: string | null;
 }): Promise<void> {

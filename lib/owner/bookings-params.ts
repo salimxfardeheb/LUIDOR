@@ -1,4 +1,5 @@
 import type { BookingStatus } from "@prisma/client";
+import { BOOKING_STATUSES, isBookingStatus } from "@/lib/bookings/status";
 
 /**
  * Filtres de la liste des réservations reçues, lus et écrits dans l'URL.
@@ -14,13 +15,7 @@ export const BOOKING_FILTER_PARAMS = { room: "salle", status: "statut" } as cons
 /** Valeur du filtre « toutes les salles » / « tous les statuts ». */
 export const ALL_FILTER_VALUE = "toutes";
 
-export const BOOKING_STATUSES = [
-  "EN_ATTENTE",
-  "EN_COURS_VERIFICATION",
-  "CONFIRMEE",
-  "ANNULEE",
-  "CLOTUREE",
-] as const satisfies readonly BookingStatus[];
+export { BOOKING_STATUSES };
 
 export interface BookingFilters {
   /** `null` = toutes les salles du propriétaire. */
@@ -33,10 +28,6 @@ export const NO_BOOKING_FILTERS: BookingFilters = { roomId: null, status: null }
 
 export function hasActiveFilters(filters: BookingFilters): boolean {
   return filters.roomId !== null || filters.status !== null;
-}
-
-function isBookingStatus(value: string): value is BookingStatus {
-  return (BOOKING_STATUSES as readonly string[]).includes(value);
 }
 
 /**

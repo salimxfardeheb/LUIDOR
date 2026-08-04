@@ -40,30 +40,34 @@ enum PaymentStatus {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
+  id                String    @id @default(cuid())
+  email             String    @unique
   /// Null pour un compte créé par un provider externe (OAuth) : seul le
   /// Credentials provider s'appuie sur ce hash.
-  passwordHash String?
-  fullName     String
-  phone        String?
-  avatarUrl    String?
-  role         UserRole  @default(CLIENT)
-  emailVerified DateTime?
+  passwordHash      String?
+  fullName          String
+  phone             String?
+  avatarUrl         String?
+  /// Identifiant Cloudinary de l'avatar, requis pour supprimer l'ancien fichier
+  /// lors d'un remplacement. Null pour un avatar qui ne vient pas de Cloudinary.
+  avatarPublicId    String?
+  role              UserRole  @default(CLIENT)
+  emailVerified     DateTime?
   /// Langues parlées, affichées sur la carte propriétaire d'une fiche salle.
-  languages    String[]  @default([])
+  languages         String[]  @default([])
   /// Délai de réponse moyen en heures. Saisi par l'équipe tant que la
   /// messagerie interne n'existe pas pour le calculer.
   responseTimeHours Int?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
-  rooms    Room[]    @relation("RoomOwner")
-  bookings Booking[] @relation("BookingClient")
-  payments Payment[] @relation("PaymentRecorder")
-  reviews  Review[]  @relation("ReviewClient")
+  accounts  Account[]
+  sessions  Session[]
+  rooms     Room[]     @relation("RoomOwner")
+  bookings  Booking[]  @relation("BookingClient")
+  payments  Payment[]  @relation("PaymentRecorder")
+  reviews   Review[]   @relation("ReviewClient")
+  favorites Favorite[]
 
   @@map("users")
 }
@@ -122,7 +126,7 @@ model Category {
   iconSlug String
 
   /// Salles dont c'est la catégorie principale (`Room.categoryId`).
-  rooms Room[]
+  rooms     Room[]
   /// Toutes les salles rattachées à cette catégorie, principale ou secondaire.
   roomLinks RoomCategory[]
 
@@ -149,67 +153,68 @@ model RoomCategory {
 }
 
 model Room {
-  id           String     @id @default(cuid())
-  ownerId      String
-  categoryId   String
-  name         String
-  description  String     @db.Text
-  city         String
+  id          String     @id @default(cuid())
+  ownerId     String
+  categoryId  String
+  name        String
+  description String     @db.Text
+  city        String
   /// Quartier, affiché dans le fil d'Ariane de la fiche salle.
-  district     String?
-  address      String
-  latitude     Float?
-  longitude    Float?
-  capacityMin  Int
-  capacityMax  Int
-  basePrice    Decimal    @db.Decimal(10, 2)
-  status       RoomStatus @default(PENDING)
+  district    String?
+  address     String
+  latitude    Float?
+  longitude   Float?
+  capacityMin Int
+  capacityMax Int
+  basePrice   Decimal    @db.Decimal(10, 2)
+  status      RoomStatus @default(PENDING)
 
   // --- Caractéristiques affichées sur la fiche salle -----------------------
   // Toutes facultatives : une salle publiée avant l'ajout de ces champs reste
   // valide, et la fiche masque simplement les lignes non renseignées.
 
   /// Superficie en m².
-  surfaceM2    Int?
+  surfaceM2        Int?
   /// Nombre d'espaces distincts (grande salle, mezzanine, jardin…).
-  spacesCount  Int?
-  hasParking   Boolean    @default(false)
-  hasAccommodation Boolean @default(false)
+  spacesCount      Int?
+  hasParking       Boolean   @default(false)
+  hasAccommodation Boolean   @default(false)
   /// Renseigné par l'équipe LIUDOR après vérification : sert de badge « vérifié ».
-  verifiedAt   DateTime?
+  verifiedAt       DateTime?
   /// Visite vidéo, mise en avant par une vignette « play » dans la galerie.
-  videoUrl     String?
+  videoUrl         String?
 
   // --- Informations pratiques ---------------------------------------------
 
   /// Plage horaire d'utilisation, ex. « 08:00 – 02:00 ».
-  openingHours String?
+  openingHours       String?
   /// Règles de sonorisation, ex. « Sonorisation autorisée jusqu'à 2h ».
-  musicPolicy  String?
+  musicPolicy        String?
   /// Libellé court de la politique d'annulation, ex. « Flexible ».
   cancellationPolicy String?
   /// Conditions complètes, affichées dans la modale ouverte depuis la fiche.
-  cancellationTerms  String? @db.Text
+  cancellationTerms  String?  @db.Text
   /// Caution demandée à la réservation.
-  depositAmount Decimal?  @db.Decimal(10, 2)
-  cleaningFee   Decimal?  @db.Decimal(10, 2)
-  petsAllowed   Boolean   @default(false)
-  wheelchairAccess Boolean @default(false)
+  depositAmount      Decimal? @db.Decimal(10, 2)
+  cleaningFee        Decimal? @db.Decimal(10, 2)
+  petsAllowed        Boolean  @default(false)
+  wheelchairAccess   Boolean  @default(false)
 
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  owner      User         @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  owner          User            @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   /// Catégorie principale : celle affichée sur les cartes et la fiche.
-  category   Category     @relation(fields: [categoryId], references: [id])
+  category       Category        @relation(fields: [categoryId], references: [id])
   /// Toutes les catégories de la salle, principale incluse (voir `RoomCategory`).
-  categories RoomCategory[]
-  photos     Photo[]
+  categories     RoomCategory[]
+  photos         Photo[]
   availabilities Availability[]
-  bookings   Booking[]
-  reviews    Review[]
-  equipments RoomEquipment[]
-  services   RoomService[]
+  bookings       Booking[]
+  reviews        Review[]
+  equipments     RoomEquipment[]
+  services       RoomService[]
+  favorites      Favorite[]
 
   @@index([ownerId])
   @@index([categoryId])
@@ -218,13 +223,13 @@ model Room {
 }
 
 model Photo {
-  id       String @id @default(cuid())
+  id       String  @id @default(cuid())
   roomId   String
   url      String
   /// Identifiant Cloudinary (`public_id`), requis pour supprimer l'asset.
   /// Null pour une photo qui ne vient pas de Cloudinary (import, seed).
   publicId String?
-  position Int    @default(0)
+  position Int     @default(0)
 
   room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
 
@@ -243,6 +248,25 @@ model Availability {
   @@unique([roomId, date])
   @@index([date])
   @@map("availabilities")
+}
+
+/// Salle enregistrée en favori par un utilisateur.
+///
+/// Clé primaire composite : un même utilisateur ne peut pas enregistrer deux
+/// fois la même salle, et l'ajout comme le retrait se font sans lecture
+/// préalable. Aucune restriction de rôle en base — un propriétaire ou un
+/// administrateur peut lui aussi mettre une salle de côté.
+model Favorite {
+  userId    String
+  roomId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roomId])
+  @@index([roomId])
+  @@map("favorites")
 }
 
 model Equipment {
@@ -287,21 +311,21 @@ model RoomService {
 }
 
 model Booking {
-  id         String        @id @default(cuid())
-  clientId   String
-  roomId     String
-  eventType  String
-  eventDate  DateTime      @db.Date
-  guestsCount Int
+  id           String        @id @default(cuid())
+  clientId     String
+  roomId       String
+  eventType    String
+  eventDate    DateTime      @db.Date
+  guestsCount  Int
   contactPhone String
-  contactEmail  String
-  status     BookingStatus @default(EN_ATTENTE)
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  contactEmail String
+  status       BookingStatus @default(EN_ATTENTE)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  client   User       @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
-  room     Room       @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  payment  Payment?
+  client  User     @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
+  room    Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  payment Payment?
 
   @@index([clientId])
   @@index([roomId])
@@ -318,21 +342,21 @@ model Payment {
   recordedBy String?
   createdAt  DateTime      @default(now())
 
-  booking     Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  recordedByUser User? @relation("PaymentRecorder", fields: [recordedBy], references: [id])
+  booking        Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  recordedByUser User?   @relation("PaymentRecorder", fields: [recordedBy], references: [id])
 
   @@index([status])
   @@map("payments")
 }
 
 model Review {
-  id       String   @id @default(cuid())
-  roomId   String
-  clientId String
-  rating   Int
-  comment  String   @db.Text
+  id        String   @id @default(cuid())
+  roomId    String
+  clientId  String
+  rating    Int
+  comment   String   @db.Text
   /// Photo jointe à l'avis, affichée en vignette sous le commentaire.
-  photoUrl String?
+  photoUrl  String?
   createdAt DateTime @default(now())
 
   room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
@@ -344,14 +368,14 @@ model Review {
 }
 
 model BlogPost {
-  id           String   @id @default(cuid())
-  title        String
-  slug         String   @unique
-  content      String   @db.Text
+  id            String    @id @default(cuid())
+  title         String
+  slug          String    @unique
+  content       String    @db.Text
   coverImageUrl String?
-  publishedAt  DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@map("blog_posts")
 }

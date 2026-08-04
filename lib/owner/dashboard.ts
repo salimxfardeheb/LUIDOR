@@ -1,6 +1,6 @@
 import type { BookingStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { bookingAmount } from "@/lib/owner/bookings";
+import { bookingAmount } from "@/lib/bookings/amount";
 
 /**
  * Données du tableau de bord propriétaire, limitées aux salles dont il est

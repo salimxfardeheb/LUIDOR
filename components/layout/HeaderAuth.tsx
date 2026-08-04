@@ -1,10 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { signOut, useSession } from "next-auth/react";
-import { LogOut } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { UserMenu } from "@/components/layout/UserMenu";
 import { Button } from "@/components/ui/Button";
-import { homePathForRole } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
 interface HeaderAuthProps {
@@ -22,34 +21,28 @@ export function HeaderAuth({ onDark = false }: HeaderAuthProps) {
         role="status"
         aria-label="Chargement de la session"
         className={cn(
-          "h-8 w-40 animate-pulse rounded-md",
+          "h-9 w-16 animate-pulse rounded-full",
           onDark ? "bg-white/10" : "bg-gray-100"
         )}
       />
     );
   }
 
-  const ghostClass = onDark
-    ? "text-gray-200 hover:bg-white/10 hover:text-white"
-    : undefined;
-
-  if (session) {
+  /*
+   * Connecté : l'avatar remplace les boutons « Mon espace » et « Déconnexion »,
+   * qui deviennent deux entrées du menu. Le nom vient de la session ; il est
+   * rafraîchi après une modification du profil (`useSession().update()`), sans
+   * quoi l'en-tête afficherait l'ancien nom jusqu'à la prochaine connexion.
+   */
+  if (session?.user) {
     return (
-      <div className="flex items-center gap-2">
-        <Link href={homePathForRole(session.user.role)}>
-          <Button variant="ghost" size="sm" className={ghostClass}>
-            Mon espace
-          </Button>
-        </Link>
-        <Button
-          variant={onDark ? "outline-light" : "outline"}
-          size="sm"
-          onClick={() => signOut({ callbackUrl: "/" })}
-        >
-          <LogOut aria-hidden className="h-4 w-4" />
-          Déconnexion
-        </Button>
-      </div>
+      <UserMenu
+        name={session.user.name ?? "Mon compte"}
+        email={session.user.email ?? ""}
+        avatarUrl={session.user.image ?? null}
+        role={session.user.role}
+        onDark={onDark}
+      />
     );
   }
 

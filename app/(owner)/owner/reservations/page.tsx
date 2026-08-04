@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { CalendarX, Building2 } from "lucide-react";
 import { BookingFilters } from "@/components/owner/BookingFilters";
 import { OwnerBookingsList } from "@/components/owner/OwnerBookingsList";
-import { OwnerEmptyState } from "@/components/owner/OwnerEmptyState";
-import { OwnerPageHeader } from "@/components/owner/OwnerPageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { auth } from "@/lib/auth";
 import { listOwnerBookings } from "@/lib/owner/bookings";
@@ -48,7 +48,7 @@ export default async function Page({ searchParams }: PageProps) {
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-6">
-      <OwnerPageHeader
+      <PageHeader
         title="Réservations reçues"
         description="Les demandes reçues sur vos salles, de la plus récente à la plus ancienne."
       />
@@ -60,7 +60,7 @@ export default async function Page({ searchParams }: PageProps) {
       </Alert>
 
       {rooms.length === 0 ? (
-        <OwnerEmptyState
+        <EmptyState
           icon={Building2}
           title="Aucune salle publiée"
           description="Les demandes de réservation arriveront ici dès qu'une de vos salles sera en ligne dans le catalogue."
@@ -77,7 +77,7 @@ export default async function Page({ searchParams }: PageProps) {
           </p>
 
           {bookings.length === 0 ? (
-            <OwnerEmptyState
+            <EmptyState
               icon={CalendarX}
               title={
                 filtered

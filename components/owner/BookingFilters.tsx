@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LayoutGrid, RotateCcw, Tag } from "lucide-react";
-import { BOOKING_STATUS_META } from "@/components/dashboard/BookingStatusBadge";
-import { OwnerFilterSelect } from "@/components/owner/OwnerFilterSelect";
+import { BOOKING_STATUS_MAP } from "@/lib/bookings/status";
+import { FilterSelect } from "@/components/ui/FilterSelect";
 import type { OwnerRoomOption } from "@/lib/owner/rooms";
 import {
   ALL_FILTER_VALUE,
@@ -47,14 +47,14 @@ export function BookingFilters({
     },
     ...BOOKING_STATUSES.map((status) => ({
       value: status,
-      label: BOOKING_STATUS_META[status].label,
+      label: BOOKING_STATUS_MAP[status].label,
       href: buildBookingsHref({ ...filters, status }),
     })),
   ];
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-end">
-      <OwnerFilterSelect
+      <FilterSelect
         id="filtre-salle"
         label="Salle"
         icon={<LayoutGrid aria-hidden className="h-4 w-4 text-secondary" />}
@@ -62,7 +62,7 @@ export function BookingFilters({
         options={roomOptions}
         className="sm:flex-1"
       />
-      <OwnerFilterSelect
+      <FilterSelect
         id="filtre-statut"
         label="Statut"
         icon={<Tag aria-hidden className="h-4 w-4 text-secondary" />}

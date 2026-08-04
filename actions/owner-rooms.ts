@@ -11,7 +11,7 @@ import {
   type FieldErrors,
 } from "@/lib/rooms/schemas";
 import {
-  deleteRoomPhoto,
+  deleteStoredPhoto,
   isStorageConfigured,
   saveRoomPhotos,
   StorageForbiddenError,
@@ -245,7 +245,7 @@ async function update(formData: FormData): Promise<RoomActionResult> {
       await prisma.photo.deleteMany({
         where: { id: { in: toDelete.map((photo) => photo.id) } },
       });
-      await Promise.all(toDelete.map((photo) => deleteRoomPhoto(photo)));
+      await Promise.all(toDelete.map((photo) => deleteStoredPhoto(photo)));
     }
 
     await prisma.$transaction([

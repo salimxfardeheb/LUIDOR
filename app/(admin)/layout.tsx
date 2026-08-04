@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
+import { SidebarAccount } from "@/components/layout/SidebarAccount";
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -52,8 +53,12 @@ export default function AdminLayout({
             </Link>
           ))}
         </nav>
+
+        {/* Sidebar marine : le menu bascule sur ses variantes claires. */}
+        <SidebarAccount onDark className="mt-auto border-t border-white/10 pt-3" />
       </aside>
-      <div className="flex-1 p-6 md:p-10">{children}</div>
+
+      <div className="min-w-0 flex-1 p-6 md:p-10">{children}</div>
     </div>
   );
 }

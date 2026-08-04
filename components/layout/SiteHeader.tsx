@@ -95,7 +95,13 @@ export function SiteHeader() {
             <Heart aria-hidden className="h-5 w-5" />
           </Link>
 
-          <div className="hidden sm:block">
+          {/*
+            Connecté, l'avatar tient dans la barre même sur un téléphone : il y
+            reste donc visible en permanence. Pour un visiteur, les deux boutons
+            « Connexion » et « Inscription » sont trop larges et basculent dans
+            le menu mobile.
+          */}
+          <div className={cn(session ? "block" : "hidden sm:block")}>
             <HeaderAuth onDark />
           </div>
 
@@ -139,9 +145,11 @@ export function SiteHeader() {
                   </Link>
                 </li>
               ))}
-              <li className="mt-2 border-t border-white/10 pt-3 sm:hidden">
-                <HeaderAuth onDark />
-              </li>
+              {!session && (
+                <li className="mt-2 border-t border-white/10 pt-3 sm:hidden">
+                  <HeaderAuth onDark />
+                </li>
+              )}
             </ul>
           </nav>
         </div>

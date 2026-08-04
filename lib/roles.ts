@@ -11,6 +11,22 @@ export const SIGN_UP_ROLES = ["CLIENT", "OWNER"] as const satisfies readonly Rol
 
 export const SIGN_IN_PATH = "/connexion";
 
+/** Comment présenter un rôle à l'utilisateur, dans son espace compte. */
+export const ROLE_LABELS: Record<Role, { label: string; description: string }> = {
+  CLIENT: {
+    label: "Client",
+    description: "Vous réservez des salles sur LIUDOR.",
+  },
+  OWNER: {
+    label: "Propriétaire",
+    description: "Vous publiez et gérez des salles sur LIUDOR.",
+  },
+  ADMIN: {
+    label: "Administrateur",
+    description: "Vous administrez la plateforme LIUDOR.",
+  },
+};
+
 /** Page d'atterrissage après connexion, par rôle. */
 export const HOME_PATH_BY_ROLE: Record<Role, string> = {
   CLIENT: "/profil",

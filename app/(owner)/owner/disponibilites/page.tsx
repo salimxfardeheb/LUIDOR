@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Building2, LayoutGrid } from "lucide-react";
 import { AvailabilityCalendar } from "@/components/owner/AvailabilityCalendar";
-import { OwnerEmptyState } from "@/components/owner/OwnerEmptyState";
-import { OwnerFilterSelect } from "@/components/owner/OwnerFilterSelect";
-import { OwnerPageHeader } from "@/components/owner/OwnerPageHeader";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { FilterSelect } from "@/components/ui/FilterSelect";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { auth } from "@/lib/auth";
 import { getOwnerRoomMonth } from "@/lib/owner/availability";
@@ -40,7 +40,7 @@ export default async function Page({ searchParams }: PageProps) {
     return (
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <Header />
-        <OwnerEmptyState
+        <EmptyState
           icon={Building2}
           title="Aucune salle à gérer"
           description="Le calendrier s'ouvre dès qu'une salle est enregistrée sur votre compte. Vous pourrez préparer ses disponibilités avant même sa mise en ligne."
@@ -66,7 +66,7 @@ export default async function Page({ searchParams }: PageProps) {
     <div className="mx-auto flex max-w-5xl flex-col gap-6">
       <Header />
 
-      <OwnerFilterSelect
+      <FilterSelect
         id="salle"
         label="Salle"
         icon={<LayoutGrid aria-hidden className="h-4 w-4 text-secondary" />}
@@ -110,7 +110,7 @@ export default async function Page({ searchParams }: PageProps) {
 
 function Header() {
   return (
-    <OwnerPageHeader
+    <PageHeader
       title="Disponibilités"
       description="Cliquez sur une date pour l'ouvrir ou la fermer à la réservation. Seules les dates ouvertes apparaissent réservables sur la fiche publique de la salle."
     />

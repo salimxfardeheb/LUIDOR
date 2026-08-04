@@ -22,7 +22,7 @@ export interface FilterSelectOption {
  * `replace` plutôt que `push` : changer de filtre n'a pas à empiler un cran
  * d'historique par choix.
  */
-export function OwnerFilterSelect({
+export function FilterSelect({
   id,
   label,
   icon,

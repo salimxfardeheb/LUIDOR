@@ -7,7 +7,20 @@ import type { RoomSummary } from "@/lib/rooms/types";
 import { formatCapacity, formatPrice, formatRating } from "@/lib/format";
 
 /** Carte salle : photo + overlays, nom, ville, capacité et prix d'appel. */
-export function RoomCard({ room }: { room: RoomSummary }) {
+export function RoomCard({
+  room,
+  favorite = false,
+  favoriteSlot,
+}: {
+  room: RoomSummary;
+  /** État initial du cœur, quand l'appelant connaît les favoris de l'utilisateur. */
+  favorite?: boolean;
+  /**
+   * Remplace le bouton favori par défaut. La page « Mes favoris » y branche le
+   * sien pour retirer la carte de la liste dans la foulée.
+   */
+  favoriteSlot?: React.ReactNode;
+}) {
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md">
       <div className="relative aspect-[4/3] overflow-hidden bg-primary-900">
@@ -39,10 +52,15 @@ export function RoomCard({ room }: { room: RoomSummary }) {
           )}
         </div>
 
-        <FavoriteButton
-          roomName={room.name}
-          className="absolute right-3 top-3 z-10"
-        />
+        <div className="absolute right-3 top-3 z-10">
+          {favoriteSlot ?? (
+            <FavoriteButton
+              roomId={room.id}
+              roomName={room.name}
+              initialFavorite={favorite}
+            />
+          )}
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-5">

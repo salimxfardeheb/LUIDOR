@@ -4,7 +4,7 @@ import * as React from "react";
  * En-tête commun aux pages du portail propriétaire : titre, phrase de contexte
  * et, éventuellement, une action alignée à droite.
  */
-export function OwnerPageHeader({
+export function PageHeader({
   title,
   description,
   children,

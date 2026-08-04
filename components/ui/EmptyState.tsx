@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
  * État vide du portail propriétaire : aucune salle, aucune réservation, aucun
  * résultat après filtrage. Toujours accompagné d'une sortie possible.
  */
-export function OwnerEmptyState({
+export function EmptyState({
   icon: Icon,
   title,
   description,
