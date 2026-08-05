@@ -23,6 +23,7 @@ const NAV_LINKS: readonly NavLink[] = [
   // Réservé aux propriétaires : la route est de toute façon refusée aux autres
   // rôles par le middleware, inutile de l'afficher aux visiteurs et aux clients.
   { href: "/owner/salles/nouvelle", label: "Publier une salle", role: "OWNER" },
+  { href: "/blog", label: "Blog" },
   { href: "/a-propos", label: "À propos" },
   { href: "/contact", label: "Contact" },
 ] as const;

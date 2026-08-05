@@ -142,8 +142,8 @@ export function BlogEditor({ post }: { post: AdminPost | null }) {
                 </p>
               ) : (
                 <p id="content-aide" className="text-xs text-gray-500">
-                  Texte simple : les paragraphes sont séparés par une ligne vide.
-                  Aucune balise HTML n&apos;est enregistrée.{" "}
+                  Aucune balise HTML n&apos;est enregistrée : la mise en forme
+                  suit les conventions ci-contre.{" "}
                   <span className="tabular-nums">
                     {content.length.toLocaleString("fr-DZ")} caractères
                   </span>
@@ -155,6 +155,8 @@ export function BlogEditor({ post }: { post: AdminPost | null }) {
         </div>
 
         <div className="flex flex-col gap-6">
+          <FormattingHelp />
+
           <Card className="flex flex-col gap-4 p-6">
             <div>
               <h2 className="text-sm font-semibold text-gray-900">
@@ -224,6 +226,40 @@ export function BlogEditor({ post }: { post: AdminPost | null }) {
         </div>
       </div>
     </form>
+  );
+}
+
+/**
+ * Conventions de mise en forme reconnues à l'affichage.
+ *
+ * Le rendu public (`lib/blog/content.ts`) interprète ces marqueurs : sans ce
+ * rappel, un rédacteur ne peut pas deviner qu'ils existent et l'article
+ * ressortirait en un seul bloc de paragraphes.
+ */
+function FormattingHelp() {
+  const rules: Array<{ syntax: string; effect: string }> = [
+    { syntax: "## Titre", effect: "Sous-titre" },
+    { syntax: "### Titre", effect: "Sous-titre secondaire" },
+    { syntax: "- élément", effect: "Liste à puces" },
+    { syntax: "1. élément", effect: "Liste numérotée" },
+    { syntax: "> citation", effect: "Citation en exergue" },
+    { syntax: "ligne vide", effect: "Nouveau paragraphe" },
+  ];
+
+  return (
+    <Card className="flex flex-col gap-3 p-6">
+      <h2 className="text-sm font-semibold text-gray-900">Mise en forme</h2>
+      <dl className="flex flex-col gap-2 text-xs">
+        {rules.map((rule) => (
+          <div key={rule.syntax} className="flex items-center justify-between gap-3">
+            <dt className="rounded-sm bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-700">
+              {rule.syntax}
+            </dt>
+            <dd className="text-gray-500">{rule.effect}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
   );
 }
 
