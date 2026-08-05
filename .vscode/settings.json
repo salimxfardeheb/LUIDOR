@@ -1,0 +1,10 @@
+{
+  // Le projet est en Prisma 6.19. L'extension VS Code (v31+) embarque par
+  // défaut le serveur de langage Prisma 7, qui signale `url` dans le bloc
+  // `datasource` comme une erreur — alors qu'il y est obligatoire en 6.
+  //
+  // Ce réglage aligne l'extension sur la version réellement utilisée. À retirer
+  // le jour de la montée en Prisma 7 (voir la note dans prisma/schema.prisma).
+  "prisma.pinToPrisma6": true,
+  "prisma.hidePrisma6Prompts": true
+}

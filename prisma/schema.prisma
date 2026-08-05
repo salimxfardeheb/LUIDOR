@@ -2,6 +2,18 @@ generator client {
   provider = "prisma-client-js"
 }
 
+/// `url` est **obligatoire** ici en Prisma 6 : sans lui, `prisma validate`
+/// échoue en P1012 et migrate comme generate cessent de fonctionner.
+///
+/// Un éditeur peut signaler « The datasource property `url` is no longer
+/// supported in schema files » : cet avertissement vient d'un outillage
+/// Prisma 7 (extension VS Code auto-mise à jour), pas du projet, qui est en
+/// 6.19. Ne pas retirer la ligne pour le faire taire — aligner l'extension sur
+/// la version du projet.
+///
+/// Le jour de la montée en Prisma 7, `url` se déplacera dans `prisma.config.ts`
+/// (clé `datasource`) et le client de `lib/prisma.ts` devra recevoir un driver
+/// adapter (`@prisma/adapter-pg`).
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
