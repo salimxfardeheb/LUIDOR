@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   LayoutGrid,
   MessageSquareQuote,
+  PenLine,
   Settings,
   ShieldCheck,
   Store,
@@ -80,6 +81,13 @@ export const ADMIN_NAV: AdminNavGroup[] = [
         icon: MessageSquareQuote,
       },
     ],
+  },
+  {
+    // Le blog est éditorial : le ranger avec les salles brouillerait un groupe
+    // qui ne parle que du parc de salles. Ce groupe accueillera les autres
+    // contenus du site le jour où il y en aura.
+    title: "Contenu",
+    items: [{ href: "/admin/blog", label: "Blog", icon: PenLine }],
   },
   {
     title: "Paramètres",
