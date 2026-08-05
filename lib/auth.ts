@@ -48,6 +48,12 @@ export const authOptions: NextAuthOptions = {
         );
         if (!passwordMatches) return null;
 
+        // Compte suspendu par l'administration : la connexion est refusée tant
+        // qu'il n'a pas été réactivé. Le refus est indistinct d'un mot de passe
+        // erroné côté formulaire — volontairement : le motif d'une suspension
+        // se donne par le support, pas par un écran de connexion.
+        if (user.suspendedAt) return null;
+
         return {
           id: user.id,
           email: user.email,

@@ -58,17 +58,25 @@ model User {
   /// Délai de réponse moyen en heures. Saisi par l'équipe tant que la
   /// messagerie interne n'existe pas pour le calculer.
   responseTimeHours Int?
+  /// Date de suspension du compte par un administrateur, `null` si le compte
+  /// est actif. La connexion est refusée tant que ce champ est renseigné.
+  suspendedAt       DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  accounts  Account[]
-  sessions  Session[]
-  rooms     Room[]     @relation("RoomOwner")
-  bookings  Booking[]  @relation("BookingClient")
-  payments  Payment[]  @relation("PaymentRecorder")
-  reviews   Review[]   @relation("ReviewClient")
-  favorites Favorite[]
+  accounts    Account[]
+  sessions    Session[]
+  rooms       Room[]           @relation("RoomOwner")
+  bookings    Booking[]        @relation("BookingClient")
+  payments    Payment[]        @relation("PaymentRecorder")
+  reviews     Review[]         @relation("ReviewClient")
+  favorites   Favorite[]
+  /// Décisions de modération prises par cet administrateur.
+  moderations RoomModeration[] @relation("RoomModerator")
+  /// Actions sensibles tracées au journal d'audit.
+  auditLogs   AuditLog[]       @relation("AuditAuthor")
 
+  @@index([role])
   @@map("users")
 }
 
@@ -203,9 +211,9 @@ model Room {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  owner          User            @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  owner          User             @relation("RoomOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   /// Catégorie principale : celle affichée sur les cartes et la fiche.
-  category       Category        @relation(fields: [categoryId], references: [id])
+  category       Category         @relation(fields: [categoryId], references: [id])
   /// Toutes les catégories de la salle, principale incluse (voir `RoomCategory`).
   categories     RoomCategory[]
   photos         Photo[]
@@ -215,11 +223,43 @@ model Room {
   equipments     RoomEquipment[]
   services       RoomService[]
   favorites      Favorite[]
+  /// Décisions de validation et de rejet prises par l'équipe LIUDOR.
+  moderations    RoomModeration[]
 
   @@index([ownerId])
   @@index([categoryId])
   @@index([city])
+  @@index([status])
   @@map("rooms")
+}
+
+enum ModerationAction {
+  APPROVED
+  REJECTED
+}
+
+/// Décision de modération prise par un administrateur sur une salle.
+///
+/// Journal et non simple champ sur `Room` : une salle peut être refusée, puis
+/// corrigée, puis validée. L'administration doit pouvoir relire cet
+/// enchaînement — le statut courant de la salle ne raconte que la fin.
+/// Le motif est obligatoire pour un rejet ; c'est ce que lit le propriétaire.
+model RoomModeration {
+  id        String           @id @default(cuid())
+  roomId    String
+  /// Auteur de la décision. `null` si le compte administrateur a été supprimé :
+  /// la décision, elle, reste au dossier.
+  adminId   String?
+  action    ModerationAction
+  reason    String?          @db.Text
+  createdAt DateTime         @default(now())
+
+  room  Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  admin User? @relation("RoomModerator", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([roomId])
+  @@index([createdAt])
+  @@map("room_moderations")
 }
 
 model Photo {
@@ -350,14 +390,19 @@ model Payment {
 }
 
 model Review {
-  id        String   @id @default(cuid())
-  roomId    String
-  clientId  String
-  rating    Int
-  comment   String   @db.Text
+  id          String    @id @default(cuid())
+  roomId      String
+  clientId    String
+  rating      Int
+  comment     String    @db.Text
   /// Photo jointe à l'avis, affichée en vignette sous le commentaire.
-  photoUrl  String?
-  createdAt DateTime @default(now())
+  photoUrl    String?
+  /// Date de mise en ligne de l'avis, `null` tant qu'il attend la modération.
+  /// Les lectures publiques (fiche salle, notes moyennes) ne retiennent que
+  /// les avis publiés ; le réglage `reviewAutoPublish` décide si un nouvel
+  /// avis est publié d'emblée ou mis en attente.
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
 
   room   Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
   client User @relation("ReviewClient", fields: [clientId], references: [id], onDelete: Cascade)
@@ -396,4 +441,69 @@ model ContactMessage {
   @@index([readAt])
   @@index([createdAt])
   @@map("contact_messages")
+}
+
+/// Réglages éditables de la plateforme.
+///
+/// Table à ligne unique (`id = "platform"`) plutôt qu'un magasin clé/valeur :
+/// chaque réglage garde son type en base, et une lecture suffit à tout charger.
+model PlatformSettings {
+  id                  String   @id @default("platform")
+  siteName            String   @default("LIUDOR")
+  tagline             String   @default("Lieux d'Or")
+  contactEmail        String   @default("contact@liudor.dz")
+  contactPhone        String?
+  address             String?
+  /// Délai minimum, en jours, entre une demande et la date de l'événement.
+  bookingLeadTimeDays Int      @default(2)
+  /// Un nouvel avis est-il publié sans passer par la modération ?
+  reviewAutoPublish   Boolean  @default(true)
+  /// Coupe les nouvelles demandes de réservation le temps d'une intervention.
+  maintenanceMode     Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+
+  @@map("platform_settings")
+}
+
+enum AuditAction {
+  SIGN_IN
+  ROOM_APPROVED
+  ROOM_REJECTED
+  USER_SUSPENDED
+  USER_REACTIVATED
+  BOOKING_CONFIRMED
+  BOOKING_CANCELLED
+  PAYMENT_RECORDED
+  REVIEW_PUBLISHED
+  REVIEW_DELETED
+  POST_PUBLISHED
+  POST_UNPUBLISHED
+  POST_SAVED
+  CATALOG_UPDATED
+  SETTINGS_UPDATED
+  PASSWORD_CHANGED
+}
+
+/// Journal des actions sensibles de l'administration.
+///
+/// Écrit par les actions serveur elles-mêmes, jamais par l'interface : une
+/// entrée ne peut donc pas manquer parce qu'un écran a oublié de la poser.
+/// `target` et `detail` sont figés au moment de l'action — le journal doit
+/// rester lisible même si la salle ou le compte concerné a disparu depuis.
+model AuditLog {
+  id        String      @id @default(cuid())
+  /// Auteur de l'action. `null` si le compte a été supprimé depuis.
+  userId    String?
+  action    AuditAction
+  /// Objet concerné, tel qu'il s'appelait au moment de l'action.
+  target    String?
+  /// Précision libre : montant encaissé, motif, ancienne et nouvelle valeur.
+  detail    String?
+  createdAt DateTime    @default(now())
+
+  user User? @relation("AuditAuthor", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action])
+  @@map("audit_logs")
 }

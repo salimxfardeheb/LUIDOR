@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
+import { BackToSiteLink } from "@/components/layout/BackToSiteLink";
 import { SidebarAccount } from "@/components/layout/SidebarAccount";
 
 const navItems = [
@@ -44,6 +45,8 @@ export default function OwnerLayout({
           ))}
         </nav>
 
+        <BackToSiteLink className="mt-2 border-t border-gray-200 pt-3" />
+
         {/*
           Le portail propriétaire n'a pas le header public : l'avatar en pied de
           colonne est son accès au profil et à la déconnexion.
@@ -52,8 +55,14 @@ export default function OwnerLayout({
       </aside>
 
       <div className="min-w-0 flex-1">
+        {/*
+          Barre mobile : la colonne est masquée, le logo y reprend son rôle de
+          retour à l'accueil.
+        */}
         <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2 md:hidden">
-          <Logo size="sm" />
+          <Link href="/" aria-label="Accueil LIUDOR">
+            <Logo size="sm" />
+          </Link>
           <SidebarAccount placement="bottom" showDetails={false} />
         </div>
         <div className="p-6 md:p-10">{children}</div>

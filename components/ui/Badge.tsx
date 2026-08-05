@@ -8,6 +8,13 @@ const badgeVariants = cva(
     variants: {
       variant: {
         neutral: "border-transparent bg-gray-100 text-gray-700",
+        /** Marine de la charte : qualifie, sans annoncer un état. */
+        primary: "border-transparent bg-primary-900/10 text-primary-900",
+        /**
+         * Or de la charte. Texte marine et non or : sur un fond doré pâle, l'or
+         * sur l'or ne se lit pas.
+         */
+        secondary: "border-transparent bg-secondary/20 text-primary-900",
         success: "border-transparent bg-success/10 text-success",
         warning: "border-transparent bg-warning/10 text-warning",
         error: "border-transparent bg-error/10 text-error",

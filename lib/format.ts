@@ -32,11 +32,23 @@ const dateFormatter = new Intl.DateTimeFormat("fr-DZ", {
   timeZone: "UTC",
 });
 
-/** Date d'événement : « 12 juin 2026 ». Accepte une chaîne `YYYY-MM-DD`. */
+/** Chaîne de date seule, sans heure : « 2026-06-12 ». */
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Date : « 12 juin 2026 ».
+ *
+ * Accepte une date seule (`YYYY-MM-DD`, comme les `@db.Date` du modèle) aussi
+ * bien qu'un horodatage ISO complet : les deux circulent dans l'application —
+ * la première pour les dates d'événement, le second pour les `createdAt` — et
+ * une seule fonction doit savoir les afficher.
+ */
 export function formatDate(value: string | Date): string {
-  const date =
-    typeof value === "string" ? new Date(`${value}T00:00:00.000Z`) : value;
-  return dateFormatter.format(date);
+  if (typeof value !== "string") return dateFormatter.format(value);
+
+  return dateFormatter.format(
+    new Date(DATE_ONLY.test(value) ? `${value}T00:00:00.000Z` : value)
+  );
 }
 
 const monthYearFormatter = new Intl.DateTimeFormat("fr-DZ", {
@@ -65,4 +77,75 @@ export function formatCapacity(min: number, max: number): string {
   return min === max
     ? `${formatNumber(max)} invités`
     : `${formatNumber(min)} – ${formatNumber(max)} invités`;
+}
+
+const percentFormatter = new Intl.NumberFormat("fr-DZ", {
+  style: "percent",
+  maximumFractionDigits: 1,
+});
+
+/**
+ * Variation d'un indicateur, signe compris : « +12,5 % », « −8 % ».
+ * Reçoit un ratio (0,125), pas un pourcentage déjà multiplié.
+ */
+export function formatChange(ratio: number): string {
+  const formatted = percentFormatter.format(Math.abs(ratio));
+  if (ratio === 0) return formatted;
+  return `${ratio > 0 ? "+" : "−"}${formatted}`;
+}
+
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("fr", {
+  numeric: "auto",
+});
+
+const RELATIVE_UNITS: ReadonlyArray<{
+  unit: Intl.RelativeTimeFormatUnit;
+  seconds: number;
+}> = [
+  { unit: "year", seconds: 60 * 60 * 24 * 365 },
+  { unit: "month", seconds: 60 * 60 * 24 * 30 },
+  { unit: "day", seconds: 60 * 60 * 24 },
+  { unit: "hour", seconds: 60 * 60 },
+  { unit: "minute", seconds: 60 },
+];
+
+/**
+ * Ancienneté d'un événement : « il y a 3 heures », « hier ».
+ *
+ * Accepte une chaîne ISO pour traverser la frontière serveur → client sans
+ * sérialisation manuelle d'un `Date`.
+ */
+export function formatRelativeTime(
+  value: string | Date,
+  now: Date = new Date()
+): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  const elapsedSeconds = (date.getTime() - now.getTime()) / 1000;
+
+  for (const { unit, seconds } of RELATIVE_UNITS) {
+    if (Math.abs(elapsedSeconds) >= seconds) {
+      return relativeTimeFormatter.format(
+        Math.round(elapsedSeconds / seconds),
+        unit
+      );
+    }
+  }
+
+  return "à l'instant";
+}
+
+const dateTimeFormatter = new Intl.DateTimeFormat("fr-DZ", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "UTC",
+});
+
+/** Horodatage complet, affiché en infobulle d'une date relative. */
+export function formatDateTime(value: string | Date): string {
+  return dateTimeFormatter.format(
+    typeof value === "string" ? new Date(value) : value
+  );
 }
