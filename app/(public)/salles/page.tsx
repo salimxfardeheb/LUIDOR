@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Building2 } from "lucide-react";
 import { CategoryChips } from "@/components/rooms/CategoryChips";
 import { RoomsGrid, RoomsGridSkeleton } from "@/components/rooms/RoomsGrid";
-import { RoomsPagination } from "@/components/rooms/RoomsPagination";
+import { Pagination } from "@/components/ui/Pagination";
 import {
   RoomsEmptyState,
   RoomsErrorState,
@@ -121,7 +121,7 @@ async function CatalogRooms({
 
         <RoomsGrid rooms={rooms} />
 
-        <RoomsPagination
+        <Pagination
           page={page}
           pageCount={pageCount}
           buildHref={(target) => {

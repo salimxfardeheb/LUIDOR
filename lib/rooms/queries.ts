@@ -158,7 +158,12 @@ async function findPageByRating(
 
   const stats = await prisma.review.groupBy({
     by: ["roomId"],
-    where: { roomId: { in: matching.map((room) => room.id) } },
+    // Une note moyenne annoncée au catalogue ne compte que les avis publiés :
+    // elle doit correspondre à ce que le visiteur lira sur la fiche.
+    where: {
+      roomId: { in: matching.map((room) => room.id) },
+      publishedAt: { not: null },
+    },
     _avg: { rating: true },
     _count: { _all: true },
   });

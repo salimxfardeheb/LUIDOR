@@ -8,12 +8,15 @@ const SIBLINGS = 1;
 /**
  * Pagination par liens : chaque page a sa propre URL, ce qui la rend
  * partageable, indexable et navigable au clavier ou sans JavaScript.
+ *
+ * Aucune dépendance au contenu paginé : le catalogue de salles, les résultats
+ * de recherche et le blog s'en servent en fournissant leur propre `buildHref`.
  */
-export function RoomsPagination({
+export function Pagination({
   page,
   pageCount,
   buildHref,
-  label = "Pagination des salles",
+  label = "Pagination",
 }: {
   page: number;
   pageCount: number;

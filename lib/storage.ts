@@ -21,6 +21,9 @@ const ROOT_FOLDER = "liudor/rooms";
 /** Dossier des avatars de comptes. */
 const AVATAR_FOLDER = "liudor/avatars";
 
+/** Images de couverture des articles du blog. */
+const BLOG_FOLDER = "liudor/blog";
+
 export interface StoredPhoto {
   /** URL publique servie par Cloudinary (HTTPS). */
   url: string;
@@ -183,7 +186,24 @@ export async function saveUserAvatar(
 }
 
 /**
- * Supprime un fichier stocké (photo de salle, avatar).
+ * Envoie l'image de couverture d'un article.
+ *
+ * Un dossier par article : remplacer une couverture laisse l'ancien fichier,
+ * que l'appelant supprime une fois la nouvelle enregistrée — l'article n'est
+ * jamais sans image entre les deux.
+ */
+export async function saveBlogCover(
+  postId: string,
+  file: File
+): Promise<StoredPhoto> {
+  if (!configure()) throw new StorageNotConfiguredError();
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return uploadBuffer(buffer, `${BLOG_FOLDER}/${postId}`);
+}
+
+/**
+ * Supprime un fichier stocké (photo de salle, avatar, couverture d'article).
  *
  * Sans `publicId` (fichier importé hors Cloudinary), il n'y a rien à supprimer
  * côté fournisseur : la ligne en base est retirée par l'appelant, on sort sans

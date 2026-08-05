@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireUserSession } from "@/lib/session";
+import { recordAudit } from "@/lib/admin/audit";
 import type { FieldErrors } from "@/lib/forms";
 import {
   parseAvatarFile,
@@ -167,6 +168,16 @@ export async function changePassword(
         passwordHash: await bcrypt.hash(fields.data.newPassword, BCRYPT_ROUNDS),
       },
     });
+
+    // Seuls les comptes administrateur sont tracés : le journal sert la
+    // surveillance de l'administration, pas le suivi des clients.
+    if (session.user.role === "ADMIN") {
+      await recordAudit({
+        userId: session.user.id,
+        action: "PASSWORD_CHANGED",
+        detail: "mot de passe administrateur modifié",
+      });
+    }
 
     return {
       ok: true,

@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserSession } from "@/lib/session";
 import { parseReviewForm } from "@/lib/account/schemas";
+import { shouldAutoPublishReviews } from "@/lib/admin/settings";
 import type { FieldErrors } from "@/lib/forms";
 
 /**
@@ -58,15 +59,31 @@ export async function submitReview(
       };
     }
 
+    // La modération est un réglage de la plateforme : publié d'emblée, ou mis
+    // en attente pour être relu depuis /admin/avis.
+    const autoPublish = await shouldAutoPublishReviews();
+
     await prisma.review.create({
-      data: { roomId, clientId: session.user.id, rating, comment },
+      data: {
+        roomId,
+        clientId: session.user.id,
+        rating,
+        comment,
+        publishedAt: autoPublish ? new Date() : null,
+      },
     });
 
     revalidatePath("/historique");
     revalidatePath("/profil");
     revalidatePath(`/salles/${roomId}`);
+    revalidatePath("/admin/avis");
 
-    return { ok: true, message: "Merci, votre avis a été publié." };
+    return {
+      ok: true,
+      message: autoPublish
+        ? "Merci, votre avis a été publié."
+        : "Merci, votre avis a été transmis. Il paraîtra après relecture par l'équipe LIUDOR.",
+    };
   } catch (error) {
     // P2002 : deux envois simultanés sur la même salle.
     if (

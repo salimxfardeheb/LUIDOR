@@ -115,7 +115,9 @@ export async function getAccountKpis(
       await Promise.all([
         prisma.room.count({ where: { ownerId: userId, status: "ACTIVE" } }),
         prisma.booking.count({ where: { room: { ownerId: userId } } }),
-        prisma.review.count({ where: { room: { ownerId: userId } } }),
+        prisma.review.count({
+          where: { room: { ownerId: userId }, publishedAt: { not: null } },
+        }),
       ]);
 
     return [

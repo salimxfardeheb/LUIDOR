@@ -109,6 +109,9 @@ const ROOM_DETAIL_INCLUDE = {
     orderBy: { service: { name: "asc" } },
   },
   reviews: {
+    // Seuls les avis publiés paraissent sur la fiche : un avis en attente de
+    // modération existe en base sans être visible du public.
+    where: { publishedAt: { not: null } },
     select: {
       id: true,
       rating: true,
@@ -152,10 +155,11 @@ export async function getRoomDetail(id: string): Promise<RoomDetail | null> {
 
   if (!room) return null;
 
-  // La répartition porte sur *tous* les avis, pas seulement ceux chargés.
+  // La répartition porte sur tous les avis *publiés*, pas seulement sur les
+  // douze chargés ci-dessus.
   const grouped = await prisma.review.groupBy({
     by: ["rating"],
-    where: { roomId: room.id },
+    where: { roomId: room.id, publishedAt: { not: null } },
     _count: { _all: true },
   });
 

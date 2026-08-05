@@ -1,14 +1,8 @@
-import type { Metadata } from "next";
-import { PagePlaceholder } from "@/components/ui/PagePlaceholder";
+import { redirect } from "next/navigation";
 
-// Route /admin/securite — protégée, rôle ADMIN.
-export const metadata: Metadata = { title: "Sécurité & Logs" };
-
+// Route /admin/securite — entrée de menu de la colonne d'administration.
+// La sécurité et les journaux sont une section de la page Paramètres : plutôt
+// que d'en tenir deux versions, cette route y renvoie directement.
 export default function Page() {
-  return (
-    <PagePlaceholder
-      title="Sécurité & Logs"
-      description="Journal des connexions et des actions sensibles réalisées depuis l'administration."
-    />
-  );
+  redirect("/admin/parametres#securite");
 }

@@ -73,7 +73,9 @@ export async function getOwnerDashboard(
   const [activeRooms, ratingAggregate, bookings] = await Promise.all([
     prisma.room.count({ where: { ownerId, status: "ACTIVE" } }),
     prisma.review.aggregate({
-      where: { room: { ownerId } },
+      // Même périmètre que la note affichée au public : les avis en attente de
+      // modération ne comptent pas encore.
+      where: { room: { ownerId }, publishedAt: { not: null } },
       _avg: { rating: true },
     }),
     prisma.booking.findMany({

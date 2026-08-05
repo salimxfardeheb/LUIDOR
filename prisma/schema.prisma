@@ -413,14 +413,17 @@ model Review {
 }
 
 model BlogPost {
-  id            String    @id @default(cuid())
-  title         String
-  slug          String    @unique
-  content       String    @db.Text
-  coverImageUrl String?
-  publishedAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  title              String
+  slug               String    @unique
+  content            String    @db.Text
+  coverImageUrl      String?
+  /// Identifiant Cloudinary de la couverture, requis pour supprimer l'ancien
+  /// fichier lors d'un remplacement. Null pour une image importée autrement.
+  coverImagePublicId String?
+  publishedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@map("blog_posts")
 }

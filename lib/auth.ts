@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { luidorPrismaAdapter } from "@/lib/auth-adapter";
 import { SIGN_IN_PATH } from "@/lib/roles";
+import { recordAudit } from "@/lib/admin/audit";
 
 const credentialsSchema = z.object({
   email: z.string().email(),
@@ -97,6 +98,20 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role;
       }
       return session;
+    },
+  },
+
+  events: {
+    /**
+     * Trace des connexions, lue par la section « Sécurité & Logs ».
+     *
+     * Posée ici et non dans `authorize()` : l'événement ne se déclenche qu'une
+     * fois la session réellement ouverte, donc une tentative refusée — mot de
+     * passe erroné, compte suspendu — n'apparaît pas comme une connexion.
+     */
+    async signIn({ user }) {
+      if (!user.id) return;
+      await recordAudit({ userId: user.id, action: "SIGN_IN" });
     },
   },
 };

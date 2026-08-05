@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { SearchCard } from "@/components/home/SearchCard";
 import { FilterPanel } from "@/components/rooms/FilterPanel";
 import { RoomsGrid, RoomsGridSkeleton } from "@/components/rooms/RoomsGrid";
-import { RoomsPagination } from "@/components/rooms/RoomsPagination";
+import { Pagination } from "@/components/ui/Pagination";
 import { SortSelect } from "@/components/rooms/SortSelect";
 import {
   RoomsEmptyState,
@@ -168,7 +168,7 @@ async function SearchResults({ filters }: { filters: RoomFilters }) {
 
         <RoomsGrid rooms={rooms} className={RESULTS_GRID} />
 
-        <RoomsPagination
+        <Pagination
           page={page}
           pageCount={pageCount}
           buildHref={(target) => resultsHref(filters, target)}
