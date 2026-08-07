@@ -8,6 +8,7 @@ import {
   RoomsEmptyState,
   RoomsErrorState,
 } from "@/components/rooms/RoomsStates";
+import { DEMO_MODE } from "@/lib/demo";
 import { getCatalogRooms, ROOMS_PER_PAGE } from "@/lib/rooms/queries";
 import {
   buildCatalogQuery,
@@ -98,14 +99,20 @@ async function CatalogRooms({
           primaryAction={{ href: "/salles", label: "Voir toutes les salles" }}
         />
       ) : (
+        // L'appel aux propriétaires mène à leur espace, coupé en mode démo.
         <RoomsEmptyState
           icon={Building2}
           title="Aucune salle publiée pour le moment"
-          description="Les premières salles arrivent bientôt. Vous êtes propriétaire ? Publiez la vôtre et soyez parmi les premiers référencés sur LIUDOR."
-          primaryAction={{
-            href: "/owner/salles/nouvelle",
-            label: "Publier une salle",
-          }}
+          description={
+            DEMO_MODE
+              ? "Les premières salles arrivent bientôt."
+              : "Les premières salles arrivent bientôt. Vous êtes propriétaire ? Publiez la vôtre et soyez parmi les premiers référencés sur LIUDOR."
+          }
+          primaryAction={
+            DEMO_MODE
+              ? undefined
+              : { href: "/owner/salles/nouvelle", label: "Publier une salle" }
+          }
         />
       );
     }

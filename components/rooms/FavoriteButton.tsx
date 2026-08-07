@@ -4,6 +4,7 @@ import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 import { toggleFavorite } from "@/actions/favorites";
+import { DEMO_MODE } from "@/lib/demo";
 import { cn } from "@/lib/utils";
 
 /**
@@ -41,6 +42,14 @@ export function FavoriteButton({
   // La carte peut être remontée avec un état serveur plus récent (retour de
   // navigation, rafraîchissement) : on s'y réaligne.
   React.useEffect(() => setFavorite(initialFavorite), [initialFavorite]);
+
+  /*
+   * Les favoris appartiennent à l'espace client, coupé en mode démo : le cœur
+   * n'aurait aucun compte où s'enregistrer et renverrait vers une connexion
+   * elle-même inaccessible. Sortie placée après les hooks, pour ne pas modifier
+   * l'ordre de leurs appels d'un rendu à l'autre.
+   */
+  if (DEMO_MODE) return null;
 
   const handleClick = () => {
     const next = !favorite;

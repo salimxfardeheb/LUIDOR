@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { isDemoVisible } from "@/lib/demo";
 import type { Role } from "@/lib/roles";
 
 interface FooterLink {
@@ -66,7 +67,8 @@ const LINK_COLUMNS: readonly FooterColumn[] = [
  * Composant client isolé : seul ce bloc a besoin de la session, le reste du
  * footer reste rendu sur le serveur. Comme dans l'en-tête, un lien restreint
  * est masqué tant que le rôle n'est pas connu — un visiteur ne le voit donc
- * jamais apparaître. Une colonne dont tous les liens sont masqués disparaît.
+ * jamais apparaître. Un lien vers une zone coupée en mode démo l'est aussi.
+ * Une colonne dont tous les liens sont masqués disparaît.
  */
 export function FooterLinks() {
   const { data: session } = useSession();
@@ -76,7 +78,8 @@ export function FooterLinks() {
     <>
       {LINK_COLUMNS.map((column) => {
         const links = column.links.filter(
-          (link) => !link.role || link.role === role
+          (link) =>
+            (!link.role || link.role === role) && isDemoVisible(link.href)
         );
 
         if (links.length === 0) return null;

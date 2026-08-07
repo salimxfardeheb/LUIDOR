@@ -4,6 +4,7 @@ import { PopularRoomsGrid } from "@/components/home/PopularRoomsGrid";
 import { RoomCardSkeleton } from "@/components/rooms/RoomCard";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Button } from "@/components/ui/Button";
+import { DEMO_MODE } from "@/lib/demo";
 import { getPopularRooms } from "@/lib/home/queries";
 
 const HEADING_ID = "salles-populaires-titre";
@@ -79,13 +80,17 @@ function EmptyState() {
       <h3 className="mt-4 text-base font-semibold text-gray-900">
         Aucune salle publiée pour le moment
       </h3>
+      {/* L'appel aux propriétaires mène à leur espace, coupé en mode démo. */}
       <p className="mt-2 max-w-md text-sm text-gray-500">
-        Les premières salles arrivent bientôt. Vous êtes propriétaire ? Publiez
-        la vôtre et soyez parmi les premiers référencés sur LIUDOR.
+        Les premières salles arrivent bientôt.
+        {!DEMO_MODE &&
+          " Vous êtes propriétaire ? Publiez la vôtre et soyez parmi les premiers référencés sur LIUDOR."}
       </p>
-      <Link href="/owner/salles/nouvelle" className="mt-6">
-        <Button>Publier une salle</Button>
-      </Link>
+      {!DEMO_MODE && (
+        <Link href="/owner/salles/nouvelle" className="mt-6">
+          <Button>Publier une salle</Button>
+        </Link>
+      )}
     </div>
   );
 }
