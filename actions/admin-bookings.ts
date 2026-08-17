@@ -5,7 +5,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession, type AdminRefusal } from "@/lib/admin/guards";
 import { recordAudit } from "@/lib/admin/audit";
+import { formatDate } from "@/lib/format";
 import { fieldErrorsFrom, type FieldErrors } from "@/lib/forms";
+import { sendBookingDecisionEmails } from "@/lib/mail";
 
 /**
  * Suivi des réservations par l'administration : décision sur une demande en
@@ -30,9 +32,20 @@ const BOOKINGS_PATH = "/admin/reservations";
 function revalidateBookings() {
   revalidatePath(BOOKINGS_PATH);
   revalidatePath("/admin/dashboard");
-  revalidatePath("/owner/reservations");
   revalidatePath("/reservations");
   revalidatePath("/historique");
+}
+
+/**
+ * Surfaces qui affichent les disponibilités de la salle : elles changent en
+ * même temps que la date se ferme.
+ */
+function revalidateRoomAvailability(roomId: string) {
+  revalidatePath("/owner/disponibilites");
+  revalidatePath("/owner/dashboard");
+  revalidatePath(`/salles/${roomId}`);
+  // La recherche par date filtre sur les disponibilités : sa liste change aussi.
+  revalidatePath("/salles");
 }
 
 const idSchema = z.string().min(1);
@@ -59,6 +72,18 @@ const paymentSchema = z.object({
  * Seul ce statut est modifiable ici : une demande encore en attente appartient
  * au propriétaire, et une réservation déjà confirmée ou clôturée ne se rejoue
  * pas depuis une liste.
+ *
+ * Une confirmation ferme la date : la disponibilité de la salle passe à
+ * `BLOCKED` dans la même transaction que le statut. Sans cette écriture, la
+ * ligne `Availability` resterait `AVAILABLE` — les calendriers masquent bien la
+ * date parce qu'ils superposent les réservations, mais tout ce qui lit la
+ * disponibilité seule (compteur de dates ouvertes du propriétaire, recherche
+ * par date) continuerait à la compter comme libre.
+ *
+ * L'annulation ne rouvre pas la date : le propriétaire l'avait peut-être fermée
+ * avant la demande, et la rouvrir d'office déciderait à sa place. Un clic sur
+ * son calendrier suffit à la libérer, plus aucune réservation confirmée ne la
+ * verrouille.
  */
 export async function setBookingDecision(
   bookingId: string,
@@ -74,8 +99,19 @@ export async function setBookingDecision(
     where: { id: parsed.data },
     select: {
       status: true,
+      roomId: true,
+      eventDate: true,
+      eventType: true,
+      guestsCount: true,
+      contactEmail: true,
       client: { select: { fullName: true } },
-      room: { select: { name: true } },
+      room: {
+        select: {
+          name: true,
+          city: true,
+          owner: { select: { fullName: true, email: true } },
+        },
+      },
     },
   });
 
@@ -92,17 +128,37 @@ export async function setBookingDecision(
     };
   }
 
+  const confirmed = decision === "CONFIRMEE";
+
   try {
-    await prisma.booking.update({
-      where: { id: parsed.data },
-      data: { status: decision },
+    // Transaction : une date confirmée mais restée ouverte serait réservable
+    // deux fois. Les deux écritures passent ensemble ou pas du tout.
+    await prisma.$transaction(async (tx) => {
+      await tx.booking.update({
+        where: { id: parsed.data },
+        data: { status: decision },
+      });
+
+      if (!confirmed) return;
+
+      // `eventDate` vient d'une colonne `@db.Date` : c'est déjà minuit UTC, la
+      // clé composite `roomId_date` s'aligne sans conversion.
+      await tx.availability.upsert({
+        where: {
+          roomId_date: { roomId: booking.roomId, date: booking.eventDate },
+        },
+        create: {
+          roomId: booking.roomId,
+          date: booking.eventDate,
+          status: "BLOCKED",
+        },
+        update: { status: "BLOCKED" },
+      });
     });
   } catch (error) {
     console.error("setBookingDecision a échoué", error);
     return { ok: false, message: "La mise à jour a échoué. Réessayez." };
   }
-
-  const confirmed = decision === "CONFIRMEE";
 
   await recordAudit({
     userId: session.adminId,
@@ -110,12 +166,28 @@ export async function setBookingDecision(
     target: `${booking.room.name} — ${booking.client.fullName}`,
   });
 
+  // Best-effort : un transport absent ou en échec est loggé, jamais bloquant —
+  // la décision est déjà en base et visible des deux côtés de la plateforme.
+  await sendBookingDecisionEmails({
+    decision,
+    clientName: booking.client.fullName,
+    clientEmail: booking.contactEmail,
+    roomName: booking.room.name,
+    roomCity: booking.room.city,
+    eventType: booking.eventType,
+    eventDate: formatDate(booking.eventDate),
+    guestsCount: booking.guestsCount,
+    ownerName: booking.room.owner.fullName,
+    ownerEmail: booking.room.owner.email,
+  });
+
   revalidateBookings();
+  if (confirmed) revalidateRoomAvailability(booking.roomId);
 
   return {
     ok: true,
     message: confirmed
-      ? "Réservation confirmée."
+      ? "Réservation confirmée : la date est fermée dans le calendrier de la salle."
       : "Réservation annulée.",
   };
 }

@@ -43,8 +43,8 @@ const LINK_COLUMNS: readonly FooterColumn[] = [
       },
       { href: "/owner/dashboard", label: "Espace propriétaire", role: "OWNER" },
       {
-        href: "/owner/reservations",
-        label: "Gérer mes réservations",
+        href: "/owner/disponibilites",
+        label: "Gérer mes disponibilités",
         role: "OWNER",
       },
       { href: "/a-propos", label: "Comment ça marche" },

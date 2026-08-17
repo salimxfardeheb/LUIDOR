@@ -16,7 +16,7 @@ const FAQ = [
   {
     question: "Comment réserver une salle ?",
     answer:
-      "Parcourez le catalogue, ouvrez la fiche d'une salle et utilisez le calendrier pour vérifier la disponibilité sur vos dates. La demande part ensuite au propriétaire, qui vous recontacte pour finaliser.",
+      "Parcourez le catalogue, ouvrez la fiche d'une salle et utilisez le calendrier pour vérifier la disponibilité sur vos dates. La réservation ne se fait pas en ligne : contactez ensuite le propriétaire depuis la fiche, il vous recontacte pour finaliser les dates et le règlement.",
   },
   {
     question: "Je suis propriétaire, comment publier ma salle ?",

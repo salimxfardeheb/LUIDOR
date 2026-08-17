@@ -1,20 +1,17 @@
 import Link from "next/link";
-import {
-  LayoutDashboard,
-  LayoutGrid,
-  CalendarDays,
-  CalendarCheck,
-} from "lucide-react";
+import { LayoutDashboard, LayoutGrid, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/ui/Logo";
 import { BackToSiteLink } from "@/components/layout/BackToSiteLink";
 import { SidebarAccount } from "@/components/layout/SidebarAccount";
 
+// Aucune réservation ne se prend en ligne : le portail propriétaire sert à
+// publier des salles et à tenir leurs disponibilités à jour, les demandes
+// arrivent ensuite par le formulaire de contact de la fiche salle.
 const navItems = [
   { href: "/owner/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/owner/salles", label: "Salles", icon: LayoutGrid },
   { href: "/owner/disponibilites", label: "Disponibilités", icon: CalendarDays },
-  { href: "/owner/reservations", label: "Réservations", icon: CalendarCheck },
 ];
 
 export default function OwnerLayout({
@@ -22,7 +19,12 @@ export default function OwnerLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <div className="flex min-h-screen-safe">
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-gray-200 bg-white p-4 md:flex">
+      {/*
+        `sticky` + hauteur d'écran : la colonne garde la taille du viewport et
+        reste en place quand le contenu défile. `overflow-y-auto` lui donne son
+        propre défilement si la navigation dépasse la hauteur disponible.
+      */}
+      <aside className="sticky top-0 hidden h-screen-safe w-60 shrink-0 flex-col overflow-y-auto border-r border-gray-200 bg-white p-4 md:flex">
         <Link href="/" aria-label="Accueil LIUDOR" className="mb-6 block px-3">
           <Logo size="sm" />
         </Link>

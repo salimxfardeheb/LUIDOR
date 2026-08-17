@@ -18,6 +18,7 @@ import { RoomHeader } from "@/components/rooms/detail/RoomHeader";
 import { RoomReviews } from "@/components/rooms/detail/RoomReviews";
 import { RoomStats } from "@/components/rooms/detail/RoomStats";
 import { RoomsGrid, RoomsGridSkeleton } from "@/components/rooms/RoomsGrid";
+import { listEventTypes } from "@/lib/bookings/event-types";
 import {
   getRoomCalendar,
   getRoomDetail,
@@ -57,6 +58,11 @@ export default async function Page({ params }: PageProps) {
 
   // Salle inexistante, en attente de validation ou suspendue : 404.
   if (!room) notFound();
+
+  // Types d'événement du formulaire de demande : la salle a sa catégorie, mais
+  // on loue un lieu, pas un thème — un mariage se tient dans une salle rangée
+  // en « Réception ».
+  const eventTypes = await listEventTypes();
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:py-10">
@@ -149,7 +155,8 @@ export default async function Page({ params }: PageProps) {
               basePrice={room.basePrice}
               capacityMin={room.capacityMin}
               capacityMax={room.capacityMax}
-              ownerId={room.owner.id}
+              eventTypes={eventTypes}
+              defaultEventType={room.categoryName}
             />
 
             <OwnerCard owner={room.owner} />

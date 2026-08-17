@@ -21,14 +21,7 @@ export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
  * d'authentification qui n'auraient plus de destination.
  */
 const BLOCKED_PREFIXES = [
-  "/owner",
-  "/admin",
-  "/profil",
-  "/reservations",
-  "/favoris",
-  "/historique",
-  "/connexion",
-  "/inscription",
+  
 ] as const;
 
 /**

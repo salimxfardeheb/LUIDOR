@@ -1,17 +1,19 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import {
   AlertCircle,
   BadgePercent,
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
-  MessageCircle,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { checkRoomAvailability, type AvailabilityResult } from "@/actions/rooms";
+import { BookingRequestModal } from "@/components/rooms/detail/BookingRequestModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { formatNumber, formatPrice } from "@/lib/format";
@@ -19,10 +21,16 @@ import { formatNumber, formatPrice } from "@/lib/format";
 /**
  * Carte de réservation de la sidebar.
  *
+ * Deux actions, dans cet ordre : vérifier une disponibilité, puis déposer une
+ * demande. Aucune des deux ne réserve quoi que ce soit — la demande part à
+ * l'équipe LIUDOR (et non au propriétaire), qui rappelle le client pour
+ * confirmer. Les textes ne doivent jamais laisser croire l'inverse.
+ *
  * « Vérifier la disponibilité » interroge réellement la base via l'action
  * serveur `checkRoomAvailability` : elle croise les jours ouverts par le
- * propriétaire (`Availability`) et les réservations en cours. Le résultat est
- * affiché sous le formulaire, sans quitter la page.
+ * propriétaire (`Availability`) et les réservations enregistrées par l'équipe
+ * LIUDOR. Le résultat est affiché sous le formulaire, sans quitter la page et
+ * sans rien enregistrer.
  */
 export function BookingCard({
   roomId,
@@ -30,17 +38,34 @@ export function BookingCard({
   basePrice,
   capacityMin,
   capacityMax,
-  ownerId,
+  eventTypes,
+  defaultEventType,
 }: {
   roomId: string;
   roomName: string;
   basePrice: number;
   capacityMin: number;
   capacityMax: number;
-  ownerId: string;
+  /** Types d'événement proposés dans la demande (catégories de la plateforme). */
+  eventTypes: string[];
+  /** Catégorie de la salle, présélectionnée dans la demande. */
+  defaultEventType: string;
 }) {
+  const router = useRouter();
+  const { data: session, status } = useSession();
+
   const [pending, setPending] = React.useState(false);
   const [result, setResult] = React.useState<AvailabilityResult | null>(null);
+  const [requestOpen, setRequestOpen] = React.useState(false);
+  const [sentDate, setSentDate] = React.useState<string | null>(null);
+
+  // La demande reprend ce qui est déjà saisi au-dessus : le visiteur n'a pas à
+  // ressaisir sa date d'arrivée ni son nombre d'invités.
+  const formRef = React.useRef<HTMLFormElement>(null);
+  const [defaults, setDefaults] = React.useState({
+    eventDate: "",
+    guestsCount: "",
+  });
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -63,13 +88,35 @@ export function BookingCard({
     }
   }
 
+  /**
+   * Réserver exige un compte : la demande est rattachée au client pour qu'il en
+   * suive le statut depuis son espace. Un visiteur est envoyé vers /connexion,
+   * qui le ramène sur cette fiche.
+   */
+  function handleRequest() {
+    if (status !== "authenticated") {
+      router.push(
+        `/connexion?callbackUrl=${encodeURIComponent(`/salles/${roomId}`)}`
+      );
+      return;
+    }
+
+    const formData = new FormData(formRef.current ?? undefined);
+    setDefaults({
+      eventDate: String(formData.get("arrivee") ?? ""),
+      guestsCount: String(formData.get("invites") ?? ""),
+    });
+    setRequestOpen(true);
+  }
+
   return (
     <section
       aria-labelledby="reservation-titre"
       className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm"
     >
       <h2 id="reservation-titre" className="sr-only">
-        Réserver {roomName}
+        Vérifier les disponibilités de {roomName} et déposer une demande de
+        réservation
       </h2>
 
       {/* Prix */}
@@ -87,7 +134,11 @@ export function BookingCard({
       </div>
       <p className="mt-1 text-xs text-gray-500">Prix à partir de</p>
 
-      <form onSubmit={handleSubmit} className="mt-5 flex flex-col gap-3">
+      <form
+        ref={formRef}
+        onSubmit={handleSubmit}
+        className="mt-5 flex flex-col gap-3"
+      >
         <div className="grid grid-cols-2 gap-3">
           <Field id="arrivee" label="Arrivée" icon={CalendarDays}>
             <Input id="arrivee" name="arrivee" type="date" required />
@@ -111,20 +162,60 @@ export function BookingCard({
           />
         </Field>
 
-        <Button type="submit" size="lg" className="mt-1 w-full" disabled={pending}>
+        <Button
+          type="submit"
+          variant="outline"
+          size="lg"
+          className="mt-1 w-full"
+          disabled={pending}
+        >
           <CalendarCheck aria-hidden className="h-4 w-4" />
           {pending ? "Vérification…" : "Vérifier la disponibilité"}
         </Button>
 
-        <Link href={`/contact?salle=${roomId}&proprietaire=${ownerId}`}>
-          <Button type="button" variant="outline" size="lg" className="w-full">
-            <MessageCircle aria-hidden className="h-4 w-4" />
-            Contacter le propriétaire
-          </Button>
-        </Link>
+        <Button
+          type="button"
+          size="lg"
+          className="w-full"
+          onClick={handleRequest}
+          disabled={status === "loading"}
+        >
+          <Sparkles aria-hidden className="h-4 w-4" />
+          Réserver chez nous
+        </Button>
+
+        <p className="text-xs leading-relaxed text-gray-500">
+          Votre demande part à l&apos;équipe LIUDOR, pas au propriétaire : nous
+          vous rappelons pour confirmer la date et le règlement. Rien
+          n&apos;est retenu avant cet appel.
+        </p>
       </form>
 
+      {sentDate && (
+        <Feedback tone="success" icon={CheckCircle2}>
+          Demande envoyée pour le {sentDate}. L&apos;équipe LIUDOR vous contacte
+          sous 24 h ouvrées pour la confirmer.
+        </Feedback>
+      )}
+
       {result && <ResultMessage result={result} capacityMax={capacityMax} />}
+
+      <BookingRequestModal
+        open={requestOpen}
+        onClose={() => setRequestOpen(false)}
+        onSent={setSentDate}
+        roomId={roomId}
+        roomName={roomName}
+        capacityMin={capacityMin}
+        capacityMax={capacityMax}
+        eventTypes={eventTypes}
+        defaults={{
+          eventType: defaultEventType,
+          eventDate: defaults.eventDate,
+          guestsCount: defaults.guestsCount,
+          email: session?.user?.email ?? "",
+        }}
+      />
     </section>
   );
 }
@@ -147,10 +238,11 @@ function ResultMessage({
   if (result.available) {
     return (
       <Feedback tone="success" icon={CheckCircle2}>
-        Salle disponible sur {result.days}{" "}
+        Salle a priori libre sur {result.days}{" "}
         {result.days > 1 ? "jours" : "jour"} — total estimé{" "}
         <strong className="font-semibold">{formatPrice(result.estimate)}</strong>{" "}
         (frais de ménage inclus, jusqu&apos;à {formatNumber(capacityMax)} invités).
+        Déposez votre demande : nous vous rappelons pour la confirmer.
       </Feedback>
     );
   }
@@ -163,7 +255,7 @@ function ResultMessage({
     <Feedback tone="warning" icon={AlertCircle}>
       {result.reason === "occupied"
         ? `Indisponible le ${shown}${extra}. Essayez d'autres dates ou consultez le calendrier ci-dessous.`
-        : `Le propriétaire n'a pas encore ouvert le ${shown}${extra} à la réservation. Contactez-le pour ces dates.`}
+        : `Le propriétaire n'a pas encore ouvert le ${shown}${extra} à la location. Envoyez tout de même votre demande : nous vérifions ces dates avec lui.`}
     </Feedback>
   );
 }

@@ -63,4 +63,10 @@ body {
     min-height: 100vh;
     min-height: 100dvh;
   }
+
+  /* Hauteur exacte d'un écran, même repli `vh` → `dvh` que ci-dessus. */
+  .h-screen-safe {
+    height: 100vh;
+    height: 100dvh;
+  }
 }
