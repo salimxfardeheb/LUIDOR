@@ -10,10 +10,46 @@ const CATEGORIES = [
   { name: "Fiançailles", iconSlug: "heart" },
   { name: "Conférence", iconSlug: "mic" },
   { name: "Séminaire", iconSlug: "presentation" },
-  { name: "Baptême", iconSlug: "church" },
   { name: "Soirée privée", iconSlug: "party-popper" },
   { name: "Réception", iconSlug: "gift" },
   { name: "Événement pro", iconSlug: "landmark" },
+];
+
+/**
+ * Témoignages de la page d'accueil.
+ *
+ * Contenu éditorial, modifiable ensuite depuis /admin/temoignages. Les `id`
+ * sont fixés pour que rejouer le seed mette à jour les mêmes lignes au lieu
+ * d'empiler des doublons.
+ */
+const TESTIMONIALS = [
+  {
+    id: "temoignage-amina",
+    authorName: "Amina Belkacem",
+    role: "Mariage · Alger",
+    rating: 5,
+    quote:
+      "Nous avons trouvé et réservé notre salle en une soirée. Les photos correspondaient exactement à la réalité, aucune mauvaise surprise le jour J.",
+    position: 1,
+  },
+  {
+    id: "temoignage-karim",
+    authorName: "Karim Haddad",
+    role: "Séminaire · Oran",
+    rating: 5,
+    quote:
+      "L'équipe a vérifié le paiement et confirmé la réservation en quelques heures. Un vrai gain de temps pour organiser notre séminaire annuel.",
+    position: 2,
+  },
+  {
+    id: "temoignage-lynda",
+    authorName: "Lynda Meziane",
+    role: "Anniversaire · Constantine",
+    rating: 4,
+    quote:
+      "Les avis des autres clients m'ont vraiment aidée à choisir. La salle était conforme et le propriétaire très réactif sur la plateforme.",
+    position: 3,
+  },
 ];
 
 /** Équipements proposés en cases à cocher par le panneau de filtres. */
@@ -305,7 +341,7 @@ const ROOMS: RoomSeed[] = [
     city: "Sétif",
     district: "Centre-ville",
     address: "Avenue du 8 mai 1945, Sétif",
-    category: "Baptême",
+    category: "Réception",
     capacityMin: 50,
     capacityMax: 180,
     basePrice: 110000,
@@ -404,6 +440,17 @@ async function main() {
       create: category,
     });
     categories.set(created.name, created.id);
+  }
+
+  // Publiés d'emblée : la section « Ils ont réservé avec LIUDOR » disparaît de
+  // l'accueil tant qu'aucun témoignage n'est en ligne.
+  for (const testimonial of TESTIMONIALS) {
+    const { id, ...fields } = testimonial;
+    await prisma.testimonial.upsert({
+      where: { id },
+      update: fields,
+      create: { id, ...fields, publishedAt: new Date() },
+    });
   }
 
   const equipments = new Map<string, string>();
@@ -584,7 +631,7 @@ async function main() {
   }
 
   console.log(
-    `Seed terminé : ${CATEGORIES.length} catégories, ${EQUIPMENTS.length} équipements, ${SERVICES.length} services, ${ROOMS.length} salles (disponibilités sur ${CALENDAR_DAYS} jours), ${owners.length + clients.length} comptes de démonstration.`
+    `Seed terminé : ${CATEGORIES.length} catégories, ${TESTIMONIALS.length} témoignages, ${EQUIPMENTS.length} équipements, ${SERVICES.length} services, ${ROOMS.length} salles (disponibilités sur ${CALENDAR_DAYS} jours), ${owners.length + clients.length} comptes de démonstration.`
   );
 }
 

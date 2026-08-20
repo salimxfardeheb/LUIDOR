@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { DESTINATIONS } from "@/lib/home/content";
+import { formatInitials } from "@/lib/format";
 import {
   ROOM_SUMMARY_SELECT,
   toRoomSummary,
@@ -60,5 +61,56 @@ export async function getPopularDestinations(): Promise<DestinationSummary[]> {
   return DESTINATIONS.map((destination) => ({
     ...destination,
     roomCount: countByCity.get(destination.city) ?? 0,
+  }));
+}
+
+/**
+ * Nombre maximum de témoignages affichés sur l'accueil.
+ *
+ * Six, soit deux rangées de trois sur grand écran : au-delà, la section
+ * prendrait plus de place que les salles qu'elle est censée mettre en valeur.
+ * L'administration choisit lesquels remontent en jouant sur leur ordre.
+ */
+export const HOME_TESTIMONIALS_COUNT = 6;
+
+export interface HomeTestimonial {
+  id: string;
+  name: string;
+  role: string;
+  rating: number;
+  quote: string;
+  /** Initiales affichées dans l'avatar, dérivées du nom (aucune photo à ce stade). */
+  initials: string;
+}
+
+/**
+ * Témoignages publiés, dans l'ordre choisi en administration.
+ *
+ * Renvoie une liste vide tant que rien n'est publié : l'accueil masque alors la
+ * section entière plutôt que d'afficher un titre sans contenu.
+ */
+export async function getHomeTestimonials(
+  take: number = HOME_TESTIMONIALS_COUNT
+): Promise<HomeTestimonial[]> {
+  const rows = await prisma.testimonial.findMany({
+    where: { publishedAt: { not: null } },
+    orderBy: [{ position: "asc" }, { publishedAt: "desc" }],
+    take,
+    select: {
+      id: true,
+      authorName: true,
+      role: true,
+      rating: true,
+      quote: true,
+    },
+  });
+
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.authorName,
+    role: row.role,
+    rating: row.rating,
+    quote: row.quote,
+    initials: formatInitials(row.authorName),
   }));
 }

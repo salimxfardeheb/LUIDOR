@@ -3,6 +3,7 @@ import {
   Banknote,
   CalendarRange,
   LayoutDashboard,
+  MessageSquareQuote,
   PenLine,
   Store,
   UserRound,
@@ -72,7 +73,14 @@ export const ADMIN_NAV: AdminNavGroup[] = [
   },
   {
     title: "Contenu",
-    items: [{ href: "/admin/blog", label: "Blog", icon: PenLine }],
+    items: [
+      { href: "/admin/blog", label: "Blog", icon: PenLine },
+      {
+        href: "/admin/temoignages",
+        label: "Témoignages",
+        icon: MessageSquareQuote,
+      },
+    ],
   },
 ];
 

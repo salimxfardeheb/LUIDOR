@@ -30,8 +30,13 @@ export const DEFAULT_SORT: SortKey = "pertinence";
 export interface RoomFilters {
   /** Ville ou quartier saisi (recherche partielle, insensible à la casse). */
   ville: string | null;
-  /** Date de l'événement au format `YYYY-MM-DD`. */
+  /** Premier jour de l'événement, au format `YYYY-MM-DD`. */
   date: string | null;
+  /**
+   * Dernier jour de l'événement, pour un événement sur plusieurs jours.
+   * `null` = une seule journée, la salle n'est vérifiée que sur `date`.
+   */
+  dateFin: string | null;
   /** Nombre d'invités : la salle doit pouvoir les accueillir. */
   invites: number | null;
   /** Type d'événement, aligné sur `Category.name`. */
@@ -103,9 +108,20 @@ export function parseRoomFilters(params: SearchParamsInput): RoomFilters {
 
   const tri = oneOf(params.tri, SORT_KEYS) as SortKey | null;
 
+  /*
+   * La date de fin n'est lue que si la case « plusieurs jours » accompagne la
+   * soumission : le champ reste dans le DOM quand la case est décochée (il est
+   * seulement masqué en CSS) et serait sinon renvoyé avec son ancienne valeur.
+   */
+  const { date, dateFin } = eventRange(
+    isoDate(params.date),
+    text(params.plusieursJours) !== null ? isoDate(params.dateFin) : null
+  );
+
   return {
     ville: text(params.ville),
-    date: isoDate(params.date),
+    date,
+    dateFin,
     invites: positiveInt(params.invites),
     type: oneOf(params.type, EVENT_TYPES),
     capaciteMin: capaMin,
@@ -127,6 +143,25 @@ function orderRange(
 }
 
 /**
+ * Bornes de l'événement. Une seule journée se note `dateFin: null` : l'URL
+ * reste courte et le reste du code n'a qu'un cas à traiter, celui d'une période
+ * réellement étalée sur plusieurs jours.
+ */
+function eventRange(
+  start: string | null,
+  end: string | null
+): { date: string | null; dateFin: string | null } {
+  // Une date de fin seule ne décrit aucune période.
+  if (start === null) return { date: null, dateFin: null };
+  if (end === null || end === start) return { date: start, dateFin: null };
+  // Période saisie à l'envers : on la remet dans l'ordre, comme les fourchettes
+  // de capacité et de budget. Le format ISO se compare comme du texte.
+  return end < start
+    ? { date: end, dateFin: start }
+    : { date: start, dateFin: end };
+}
+
+/**
  * Sérialise des filtres en query string, en omettant tout ce qui est inactif
  * ou à sa valeur par défaut : les URLs restent courtes et comparables.
  */
@@ -139,6 +174,12 @@ export function buildRoomsQuery(
 
   if (merged.ville) params.set("ville", merged.ville);
   if (merged.date) params.set("date", merged.date);
+  if (merged.date && merged.dateFin) {
+    // Le drapeau accompagne toujours la date de fin : c'est lui qui autorise
+    // `parseRoomFilters` à la relire.
+    params.set("plusieursJours", "1");
+    params.set("dateFin", merged.dateFin);
+  }
   if (merged.invites) params.set("invites", String(merged.invites));
   if (merged.type) params.set("type", merged.type);
   if (merged.capaciteMin) params.set("capaciteMin", String(merged.capaciteMin));
@@ -178,7 +219,13 @@ export function describeRoomFilters(filters: RoomFilters): string[] {
 
   if (filters.type) labels.push(filters.type);
   if (filters.ville) labels.push(filters.ville);
-  if (filters.date) labels.push(formatDate(filters.date));
+  if (filters.date) {
+    labels.push(
+      filters.dateFin
+        ? `Du ${formatDate(filters.date)} au ${formatDate(filters.dateFin)}`
+        : formatDate(filters.date)
+    );
+  }
   if (filters.invites) labels.push(`${formatNumber(filters.invites)} invités`);
 
   const capacity = describeRange(
@@ -194,6 +241,65 @@ export function describeRoomFilters(filters: RoomFilters): string[] {
   labels.push(...filters.equipements);
 
   return labels;
+}
+
+/**
+ * Critères présents dans l'URL mais écartés au parsing : date incomplète,
+ * nombre d'invités hors bornes, type d'événement inconnu.
+ *
+ * Les formulaires de recherche sont en `noValidate` — le clic sur « Rechercher »
+ * navigue toujours, même quand un champ est mal rempli. Sans ce rappel, la page
+ * afficherait des résultats plus larges que la saisie sans jamais le dire.
+ */
+export function describeIgnoredFilters(
+  params: SearchParamsInput,
+  filters: RoomFilters
+): string[] {
+  const ignored: string[] = [];
+
+  if (text(params.date) !== null && filters.date === null) {
+    ignored.push("la date de l'événement, incomplète ou invalide");
+  }
+  if (text(params.invites) !== null && filters.invites === null) {
+    ignored.push("le nombre d'invités, qui doit être un entier supérieur à 0");
+  }
+  if (text(params.type) !== null && filters.type === null) {
+    ignored.push("le type d'événement, inconnu du catalogue");
+  }
+  if (text(params.plusieursJours) !== null && text(params.dateFin) !== null) {
+    if (isoDate(params.dateFin) === null) {
+      ignored.push("la date de fin, incomplète ou invalide");
+    } else if (filters.date === null) {
+      ignored.push("la date de fin, faute de date de début");
+    }
+  }
+  if (
+    hasInvalidNumber(params.capaciteMin, filters.capaciteMin, filters.capaciteMax) ||
+    hasInvalidNumber(params.capaciteMax, filters.capaciteMax, filters.capaciteMin)
+  ) {
+    ignored.push("une borne de capacité, qui doit être un entier supérieur à 0");
+  }
+  if (
+    hasInvalidNumber(params.prixMin, filters.prixMin, filters.prixMax) ||
+    hasInvalidNumber(params.prixMax, filters.prixMax, filters.prixMin)
+  ) {
+    ignored.push("une borne de budget, qui doit être un entier supérieur à 0");
+  }
+
+  return ignored;
+}
+
+/**
+ * Une borne saisie qui n'a produit aucune valeur. `orderRange` pouvant avoir
+ * permuté les deux bornes, on considère la paire : tant qu'une des deux est
+ * renseignée, la saisie a bien été prise en compte.
+ */
+function hasInvalidNumber(
+  raw: string | string[] | undefined,
+  parsed: number | null,
+  sibling: number | null
+): boolean {
+  return text(raw) !== null && parsed === null && sibling === null;
 }
 
 function describeRange(

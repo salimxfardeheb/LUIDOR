@@ -34,6 +34,8 @@ const OPTIONAL_FIELDS = [
   "prixMin",
   "prixMax",
   "date",
+  "dateFin",
+  "plusieursJours",
   "invites",
 ] as const;
 
@@ -45,9 +47,9 @@ const OPTIONAL_FIELDS = [
  * vides et naviguer côté client — l'URL reste donc l'unique source de vérité, et
  * un lien de résultats filtrés est toujours partageable.
  *
- * `date`, `invites` et `tri` sont repris en champs cachés : ils appartiennent à
- * la barre de recherche et au sélecteur de tri, mais doivent survivre à
- * l'application d'un filtre.
+ * Les dates de l'événement, le nombre d'invités et le tri sont repris en champs
+ * cachés : ils appartiennent à la barre de recherche et au sélecteur de tri,
+ * mais doivent survivre à l'application d'un filtre.
  */
 export function FilterPanel({
   filters,
@@ -108,6 +110,12 @@ export function FilterPanel({
       action={RESULTS_PATH}
       method="get"
       onSubmit={handleSubmit}
+      /*
+       * Comme la barre de recherche : sans JavaScript, une capacité ou un
+       * budget mal saisi bloquait la soumission native sans rien dire. On laisse
+       * passer et c'est le parsing de l'URL qui écarte les valeurs invalides.
+       */
+      noValidate
       aria-labelledby="filtres-titre"
       /*
        * Sticky sous l'en-tête du site (4rem) et la barre de recherche
@@ -248,6 +256,14 @@ export function FilterPanel({
 
       {/* Critères pilotés ailleurs dans la page, préservés à la soumission. */}
       <input type="hidden" name="date" value={filters.date ?? ""} />
+      {/* Le drapeau n'est émis qu'avec une période réelle : c'est lui qui
+          autorise le parsing à relire la date de fin. */}
+      {filters.dateFin !== null && (
+        <>
+          <input type="hidden" name="plusieursJours" value="1" />
+          <input type="hidden" name="dateFin" value={filters.dateFin} />
+        </>
+      )}
       <input
         type="hidden"
         name="invites"

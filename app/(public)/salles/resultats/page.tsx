@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { SearchCard } from "@/components/home/SearchCard";
 import { FilterPanel } from "@/components/rooms/FilterPanel";
 import { RoomsGrid, RoomsGridSkeleton } from "@/components/rooms/RoomsGrid";
+import { Alert } from "@/components/ui/Alert";
 import { Pagination } from "@/components/ui/Pagination";
 import { SortSelect } from "@/components/rooms/SortSelect";
 import {
@@ -16,6 +17,7 @@ import {
 } from "@/lib/rooms/queries";
 import {
   buildRoomsQuery,
+  describeIgnoredFilters,
   describeRoomFilters,
   parseRoomFilters,
   type RoomFilters,
@@ -47,6 +49,7 @@ export default function Page({
 }) {
   const filters = parseRoomFilters(searchParams);
   const criteria = describeRoomFilters(filters);
+  const ignored = describeIgnoredFilters(searchParams, filters);
 
   /*
    * Signature de la recherche en cours. Elle sert de `key` aux trois éléments
@@ -66,6 +69,7 @@ export default function Page({
             values={{
               ville: filters.ville,
               date: filters.date,
+              dateFin: filters.dateFin,
               invites: filters.invites,
               type: filters.type,
             }}
@@ -95,6 +99,22 @@ export default function Page({
               Aucun critère : voici toutes les salles publiées. Affinez avec la
               barre de recherche ou les filtres.
             </p>
+          )}
+
+          {/* Les formulaires ne bloquent plus la soumission : c'est ici qu'on
+              dit ce qui a été saisi mais pas appliqué. */}
+          {ignored.length > 0 && (
+            <Alert
+              variant="warning"
+              title="Certains critères n'ont pas été pris en compte"
+              className="mt-4 max-w-2xl"
+            >
+              <ul className="list-disc space-y-0.5 pl-4">
+                {ignored.map((label) => (
+                  <li key={label}>{label}</li>
+                ))}
+              </ul>
+            </Alert>
           )}
         </header>
 

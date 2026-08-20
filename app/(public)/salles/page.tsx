@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Building2 } from "lucide-react";
+import { SearchCard } from "@/components/home/SearchCard";
 import { CategoryChips } from "@/components/rooms/CategoryChips";
 import { RoomsGrid, RoomsGridSkeleton } from "@/components/rooms/RoomsGrid";
 import { Pagination } from "@/components/ui/Pagination";
@@ -47,10 +48,25 @@ export default function Page({ searchParams }: PageProps) {
           {category ? `Salles pour ${category.name.toLowerCase()}` : "Catalogue des salles"}
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-gray-500">
-          Toutes les salles vérifiées et publiées sur LIUDOR. Filtrez par type
-          d&apos;événement, puis affinez avec la recherche pour une date précise.
+          Toutes les salles vérifiées et publiées sur LIUDOR. Lancez une
+          recherche pour une date précise, ou parcourez le catalogue par type
+          d&apos;événement.
         </p>
       </header>
+
+      {/*
+        Même barre qu'à l'accueil : elle mène à /salles/resultats. La catégorie
+        parcourue préremplit le type d'événement — `CATEGORIES` et `EVENT_TYPES`
+        partagent leurs libellés — et la `key` remonte les champs non contrôlés
+        quand on passe d'une catégorie à l'autre.
+      */}
+      <div className="mt-8">
+        <SearchCard
+          key={category?.slug ?? "tous"}
+          values={{ type: category?.name ?? null }}
+          className="shadow-sm"
+        />
+      </div>
 
       <div className="mt-8">
         <CategoryChips activeSlug={category?.slug ?? null} />

@@ -90,12 +90,20 @@ function buildWhere(filters: RoomFilters): Prisma.RoomWhereInput {
     conditions.push({ equipments: { some: { equipment: { name } } } });
   }
 
+  /*
+   * Disponibilité sur toute la période demandée : un seul jour bloqué ou déjà
+   * réservé suffit à écarter la salle. Un événement d'une journée se ramène au
+   * même test avec `dateFin` égale à `date`.
+   */
   if (filters.date) {
-    const date = toUtcDate(filters.date);
+    const period = {
+      gte: toUtcDate(filters.date),
+      lte: toUtcDate(filters.dateFin ?? filters.date),
+    };
     conditions.push({
-      availabilities: { none: { date, status: "BLOCKED" } },
+      availabilities: { none: { date: period, status: "BLOCKED" } },
       bookings: {
-        none: { eventDate: date, status: { in: BLOCKING_BOOKING_STATUSES } },
+        none: { eventDate: period, status: { in: BLOCKING_BOOKING_STATUSES } },
       },
     });
   }

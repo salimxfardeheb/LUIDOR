@@ -2,7 +2,6 @@ import {
   BadgeCheck,
   CalendarClock,
   Cake,
-  Church,
   Gem,
   Gift,
   Headphones,
@@ -37,7 +36,6 @@ export const CATEGORIES: readonly HomeCategory[] = [
   { name: "Fiançailles", slug: "fiancailles", icon: Heart },
   { name: "Conférence", slug: "conference", icon: Mic },
   { name: "Séminaire", slug: "seminaire", icon: Presentation },
-  { name: "Baptême", slug: "bapteme", icon: Church },
   { name: "Soirée privée", slug: "soiree-privee", icon: PartyPopper },
   { name: "Réception", slug: "reception", icon: Gift },
   { name: "Événement pro", slug: "evenement-pro", icon: Landmark },
@@ -98,46 +96,6 @@ export const FEATURES: readonly HomeFeature[] = [
     description:
       "Une équipe joignable tous les jours pour suivre votre dossier jusqu'à l'événement.",
     icon: Headphones,
-  },
-] as const;
-
-export interface HomeTestimonial {
-  id: string;
-  name: string;
-  role: string;
-  rating: number;
-  quote: string;
-  /** Initiales affichées dans l'avatar (aucune photo réelle à ce stade). */
-  initials: string;
-}
-
-export const TESTIMONIALS: readonly HomeTestimonial[] = [
-  {
-    id: "amina",
-    name: "Amina Belkacem",
-    role: "Mariage · Alger",
-    rating: 5,
-    quote:
-      "Nous avons trouvé et réservé notre salle en une soirée. Les photos correspondaient exactement à la réalité, aucune mauvaise surprise le jour J.",
-    initials: "AB",
-  },
-  {
-    id: "karim",
-    name: "Karim Haddad",
-    role: "Séminaire · Oran",
-    rating: 5,
-    quote:
-      "L'équipe a vérifié le paiement et confirmé la réservation en quelques heures. Un vrai gain de temps pour organiser notre séminaire annuel.",
-    initials: "KH",
-  },
-  {
-    id: "lynda",
-    name: "Lynda Meziane",
-    role: "Anniversaire · Constantine",
-    rating: 4,
-    quote:
-      "Les avis des autres clients m'ont vraiment aidée à choisir. La salle était conforme et le propriétaire très réactif sur la plateforme.",
-    initials: "LM",
   },
 ] as const;
 

@@ -465,6 +465,36 @@ model BlogPost {
   @@map("blog_posts")
 }
 
+/// Témoignage mis en avant sur la page d'accueil.
+///
+/// Distinct de `Review` : un avis est laissé par un client sur une salle
+/// précise et reste rattaché à son séjour, alors qu'un témoignage est choisi et
+/// saisi par l'équipe pour la vitrine — il peut citer quelqu'un qui n'a pas de
+/// compte, ou résumer plusieurs échanges. Les deux ne se remplacent pas, d'où
+/// deux tables.
+///
+/// Comme un article, un témoignage reste invisible tant que `publishedAt` est
+/// nul : l'équipe le prépare, le relit, puis le met en ligne.
+model Testimonial {
+  id          String    @id @default(cuid())
+  /// Nom affiché sous la citation. Les initiales de l'avatar en sont dérivées.
+  authorName  String
+  /// Contexte affiché sous le nom, ex. « Mariage · Alger ».
+  role        String
+  /// Note sur 5, affichée en étoiles.
+  rating      Int
+  quote       String    @db.Text
+  /// Ordre d'affichage croissant sur l'accueil ; les ex æquo sont départagés
+  /// par la date de publication, la plus récente en premier.
+  position    Int       @default(0)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([publishedAt, position])
+  @@map("testimonials")
+}
+
 /// Message envoyé depuis le formulaire /contact. L'équipe LIUDOR le lit dans
 /// l'administration (/admin/messages) ; un exemplaire part aussi par email.
 model ContactMessage {
@@ -520,6 +550,9 @@ enum AuditAction {
   POST_PUBLISHED
   POST_UNPUBLISHED
   POST_SAVED
+  TESTIMONIAL_SAVED
+  TESTIMONIAL_PUBLISHED
+  TESTIMONIAL_UNPUBLISHED
   CATALOG_UPDATED
   SETTINGS_UPDATED
   PASSWORD_CHANGED

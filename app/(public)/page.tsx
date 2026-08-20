@@ -43,7 +43,11 @@ export default function Page() {
       </Suspense>
 
       <WhyLiudor />
-      <Testimonials />
+
+      <Suspense fallback={null}>
+        <Testimonials />
+      </Suspense>
+
       <Newsletter />
     </>
   );
