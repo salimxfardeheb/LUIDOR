@@ -3,14 +3,10 @@ import { ArrowRight } from "lucide-react";
 import { AboutSection } from "@/components/about/AboutSection";
 import { Button } from "@/components/ui/Button";
 import { ABOUT_CONTACT } from "@/lib/about/content";
-import { isDemoVisible } from "@/lib/demo";
 
 /**
  * Bloc contact : coordonnées de l'équipe et deux portes d'entrée selon le
  * profil du visiteur — organisateur d'événement ou propriétaire de salle.
- *
- * La porte d'entrée propriétaire passe par l'inscription : elle disparaît en
- * mode démo, où seul le site public est ouvert.
  */
 export function AboutContact() {
   return (
@@ -43,9 +39,8 @@ export function AboutContact() {
         </ul>
 
         <div className="flex flex-col gap-4">
-          {ABOUT_CONTACT.actions
-            .filter(({ href }) => isDemoVisible(href))
-            .map(({ title, description, href, label, icon: Icon }) => (
+          {ABOUT_CONTACT.actions.map(
+            ({ title, description, href, label, icon: Icon }) => (
               <div
                 key={href}
                 className="flex flex-1 flex-col rounded-lg border border-gray-200 bg-white p-6 shadow-sm"

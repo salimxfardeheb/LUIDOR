@@ -1,7 +1,6 @@
-import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
-import { withAuth, type NextRequestWithAuth } from "next-auth/middleware";
+import { NextResponse } from "next/server";
+import { withAuth } from "next-auth/middleware";
 import { SIGN_IN_PATH, requiredRoleFor } from "@/lib/roles";
-import { DEMO_MODE, isDemoBlocked } from "@/lib/demo";
 
 /**
  * Protection des groupes de routes :
@@ -38,31 +37,7 @@ const authMiddleware = withAuth(
   }
 );
 
-/**
- * Seuls chemins du matcher qui n'exigent aucune authentification : ils n'y
- * figurent que pour pouvoir être coupés en mode démo (voir `lib/demo.ts`).
- * Les passer à `withAuth` renverrait /connexion vers lui-même.
- */
-const DEMO_ONLY_PATHS: readonly string[] = [SIGN_IN_PATH, "/inscription"];
-
-export default function middleware(request: NextRequest, event: NextFetchEvent) {
-  const { pathname } = request.nextUrl;
-
-  /*
-   * La coupure démo passe avant l'authentification : un visiteur qui tape
-   * /admin doit revenir à l'accueil, pas atterrir sur un écran de connexion
-   * qui trahirait l'existence d'un back-office.
-   */
-  if (DEMO_MODE && isDemoBlocked(pathname)) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
-
-  if (DEMO_ONLY_PATHS.includes(pathname)) {
-    return NextResponse.next();
-  }
-
-  return authMiddleware(request as NextRequestWithAuth, event);
-}
+export default authMiddleware;
 
 export const config = {
   matcher: [
@@ -72,8 +47,5 @@ export const config = {
     "/reservations/:path*",
     "/favoris/:path*",
     "/historique/:path*",
-    // Coupés en mode démo uniquement — laissés passer sinon.
-    "/connexion",
-    "/inscription",
   ],
 };

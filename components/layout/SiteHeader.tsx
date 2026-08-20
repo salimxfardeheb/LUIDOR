@@ -7,7 +7,6 @@ import { useSession } from "next-auth/react";
 import { Heart, Menu, X } from "lucide-react";
 import { LogoMark } from "@/components/ui/Logo";
 import { HeaderAuth } from "@/components/layout/HeaderAuth";
-import { DEMO_MODE, isDemoVisible } from "@/lib/demo";
 import type { Role } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -43,10 +42,7 @@ export function SiteHeader() {
   const role = session?.user?.role;
   const navLinks = React.useMemo(
     () =>
-      NAV_LINKS.filter(
-        (link) =>
-          (!link.role || link.role === role) && isDemoVisible(link.href)
-      ),
+      NAV_LINKS.filter((link) => !link.role || link.role === role),
     [role]
   );
 
@@ -93,31 +89,23 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex items-center gap-2">
-          {/*
-            En mode démo, les favoris et l'authentification mènent à des espaces
-            coupés : on retire les deux plutôt que d'offrir des impasses.
-          */}
-          {!DEMO_MODE && (
-            <>
-              <Link
-                href="/favoris"
-                aria-label="Mes favoris"
-                className="hidden rounded-md p-2 text-gray-200 transition-colors hover:bg-white/10 hover:text-secondary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary-900 sm:inline-flex"
-              >
-                <Heart aria-hidden className="h-5 w-5" />
-              </Link>
+          <Link
+            href="/favoris"
+            aria-label="Mes favoris"
+            className="hidden rounded-md p-2 text-gray-200 transition-colors hover:bg-white/10 hover:text-secondary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary-900 sm:inline-flex"
+          >
+            <Heart aria-hidden className="h-5 w-5" />
+          </Link>
 
-              {/*
-                Connecté, l'avatar tient dans la barre même sur un téléphone : il
-                y reste donc visible en permanence. Pour un visiteur, les deux
-                boutons « Connexion » et « Inscription » sont trop larges et
-                basculent dans le menu mobile.
-              */}
-              <div className={cn(session ? "block" : "hidden sm:block")}>
-                <HeaderAuth onDark />
-              </div>
-            </>
-          )}
+          {/*
+            Connecté, l'avatar tient dans la barre même sur un téléphone : il y
+            reste donc visible en permanence. Pour un visiteur, les deux boutons
+            « Connexion » et « Inscription » sont trop larges et basculent dans
+            le menu mobile.
+          */}
+          <div className={cn(session ? "block" : "hidden sm:block")}>
+            <HeaderAuth onDark />
+          </div>
 
           <button
             type="button"
@@ -159,7 +147,7 @@ export function SiteHeader() {
                   </Link>
                 </li>
               ))}
-              {!DEMO_MODE && !session && (
+              {!session && (
                 <li className="mt-2 border-t border-white/10 pt-3 sm:hidden">
                   <HeaderAuth onDark />
                 </li>
