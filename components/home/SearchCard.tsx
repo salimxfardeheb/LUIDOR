@@ -194,6 +194,12 @@ function MultiDayField({ checked }: { checked: boolean }) {
  * Le libellé est un nœud : celui de la date de début change avec la case
  * « plusieurs jours ». Seule la variante visible entre dans le nom accessible du
  * champ, `display: none` excluant l'autre.
+ *
+ * Cocher la case teinte aussi les deux champs, qui reprennent la transition de
+ * couleur d'`Input` : la période qui s'ouvre se remarque, au lieu d'un second
+ * champ qui apparaîtrait sans crier gare. La règle `:has()` embarque la
+ * spécificité d'un id et l'emporterait sur `focus-visible:border-accent` —
+ * d'où le `!` qui rend au champ focalisé sa bordure pleine.
  */
 function DateField({
   id,
@@ -215,7 +221,17 @@ function DateField({
         <CalendarDays aria-hidden className="h-3.5 w-3.5 shrink-0 text-secondary" />
         {label}
       </label>
-      <Input id={id} name={id} type="date" defaultValue={defaultValue} />
+      <Input
+        id={id}
+        name={id}
+        type="date"
+        defaultValue={defaultValue}
+        className={cn(
+          "group-has-[#plusieurs-jours:checked]:border-secondary/40",
+          "group-has-[#plusieurs-jours:checked]:bg-secondary/5",
+          "focus-visible:!border-secondary"
+        )}
+      />
     </div>
   );
 }

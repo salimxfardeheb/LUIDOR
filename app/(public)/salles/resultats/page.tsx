@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { SearchCard } from "@/components/home/SearchCard";
 import { FilterPanel } from "@/components/rooms/FilterPanel";
 import { RoomsGrid, RoomsGridSkeleton } from "@/components/rooms/RoomsGrid";
@@ -17,6 +18,8 @@ import {
 } from "@/lib/rooms/queries";
 import {
   buildRoomsQuery,
+  countActiveFilters,
+  DEFAULT_SORT,
   describeIgnoredFilters,
   describeRoomFilters,
   parseRoomFilters,
@@ -50,6 +53,24 @@ export default function Page({
   const filters = parseRoomFilters(searchParams);
   const criteria = describeRoomFilters(filters);
   const ignored = describeIgnoredFilters(searchParams, filters);
+
+  /*
+   * Recherche lancée les champs vides : « Résultats de recherche » n'aurait rien
+   * à annoncer, et la page listerait le catalogue sous un titre qui ment. On
+   * renvoie donc sur le catalogue, dont c'est exactement le rôle.
+   *
+   * Le tri, la pagination et les critères écartés font rester : ils signalent
+   * une intention (un ordre choisi, une saisie à corriger) que la redirection
+   * effacerait sans rien dire.
+   */
+  if (
+    countActiveFilters(filters) === 0 &&
+    ignored.length === 0 &&
+    filters.tri === DEFAULT_SORT &&
+    filters.page === 1
+  ) {
+    redirect("/salles");
+  }
 
   /*
    * Signature de la recherche en cours. Elle sert de `key` aux trois éléments
