@@ -25,6 +25,17 @@ export const ROOM_LIMITS = {
   label: { min: 3, max: 40 },
   /** Précision libre attachée à un équipement (« 120 places »). */
   detail: { max: 60 },
+  /** Quartier, affiché dans le fil d'Ariane. */
+  district: { max: 80 },
+  /** Superficie en m². */
+  surface: { min: 1, max: 100_000 },
+  /** Nombre d'espaces distincts (grande salle, mezzanine, jardin…). */
+  spaces: { min: 1, max: 50 },
+  /** Ligne d'information pratique : horaires, sonorisation, annulation. */
+  shortText: { max: 120 },
+  /** Conditions d'annulation complètes, ouvertes dans une modale. */
+  terms: { max: 4000 },
+  videoUrl: { max: 500 },
   categories: { max: 9 },
   equipments: { max: 30 },
   services: { max: 20 },
@@ -110,6 +121,16 @@ const label = (subject: string) =>
     );
 
 /**
+ * Texte facultatif : vide vaut `null`, pour que la fiche masque la ligne au
+ * lieu d'afficher un blanc.
+ */
+const optionalText = (subject: string, max: number) =>
+  z
+    .string()
+    .max(max, `${subject} est limité à ${max} caractères.`)
+    .transform((value) => (value === "" ? null : value));
+
+/**
  * Entier facultatif : le champ laissé vide vaut `null`, et n'est contrôlé que
  * s'il porte une valeur.
  */
@@ -169,6 +190,71 @@ export const roomInputSchema = z
       .string()
       .min(ROOM_LIMITS.address.min, "Indiquez l'adresse complète.")
       .max(ROOM_LIMITS.address.max, "L'adresse est trop longue."),
+    /** Quartier : il complète le fil d'Ariane et l'adresse affichée. */
+    district: optionalText("Le quartier", ROOM_LIMITS.district.max),
+    surfaceM2: optionalPositiveIntFromForm("La superficie")
+      .refine((value) => value === null || value >= ROOM_LIMITS.surface.min, {
+        message: "La superficie doit être d'au moins 1 m².",
+      })
+      .refine((value) => value === null || value <= ROOM_LIMITS.surface.max, {
+        message: "La superficie est irréaliste.",
+      }),
+    spacesCount: optionalPositiveIntFromForm("Le nombre d'espaces")
+      .refine((value) => value === null || value >= ROOM_LIMITS.spaces.min, {
+        message: "Une salle compte au moins un espace.",
+      })
+      .refine((value) => value === null || value <= ROOM_LIMITS.spaces.max, {
+        message: `${ROOM_LIMITS.spaces.max} espaces au maximum.`,
+      }),
+    /**
+     * Visite vidéo : une vignette de la galerie y renvoie. Le lien s'ouvre chez
+     * un tiers (YouTube, Drive…), d'où le contrôle du protocole — `javascript:`
+     * n'a rien à faire dans un href posé par un tiers.
+     */
+    videoUrl: optionalText("Le lien de la vidéo", ROOM_LIMITS.videoUrl.max)
+      .refine((value) => value === null || /^https?:\/\//i.test(value), {
+        message: "Le lien de la vidéo doit commencer par http:// ou https://.",
+      })
+      .refine(
+        (value) => {
+          if (value === null) return true;
+          try {
+            new URL(value);
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { message: "Le lien de la vidéo n'est pas une adresse valide." }
+      ),
+    openingHours: optionalText("Les horaires", ROOM_LIMITS.shortText.max),
+    musicPolicy: optionalText(
+      "La règle de sonorisation",
+      ROOM_LIMITS.shortText.max
+    ),
+    cancellationPolicy: optionalText(
+      "La politique d'annulation",
+      ROOM_LIMITS.shortText.max
+    ),
+    cancellationTerms: optionalText(
+      "Les conditions d'annulation",
+      ROOM_LIMITS.terms.max
+    ),
+    depositAmount: optionalPositiveIntFromForm("La caution")
+      .refine((value) => value === null || value >= ROOM_LIMITS.price.min, {
+        message: "La caution doit être supérieure à 0.",
+      })
+      .refine((value) => value === null || value <= ROOM_LIMITS.price.max, {
+        message: "La caution est irréaliste.",
+      }),
+    cleaningFee: optionalPositiveIntFromForm("Les frais de ménage")
+      .refine((value) => value === null || value >= ROOM_LIMITS.price.min, {
+        message: "Les frais de ménage doivent être supérieurs à 0.",
+      })
+      .refine((value) => value === null || value <= ROOM_LIMITS.price.max, {
+        message: "Les frais de ménage sont irréalistes.",
+      }),
+    petsAllowed: z.boolean(),
     /**
      * Catégories de la salle, transmises par **libellé** et non par identifiant :
      * la liste proposée est tenue dans le code (`lib/rooms/categories.ts`) et un
@@ -481,9 +567,21 @@ export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
       "categoryNames",
       (value) => findCategory(value)?.name ?? null
     ),
+    district: text(formData.get("district")),
     capacityMin: text(formData.get("capacityMin")),
     capacityMax: text(formData.get("capacityMax")),
+    surfaceM2: text(formData.get("surfaceM2")),
+    spacesCount: text(formData.get("spacesCount")),
     basePrice: text(formData.get("basePrice")),
+    videoUrl: text(formData.get("videoUrl")),
+    openingHours: text(formData.get("openingHours")),
+    musicPolicy: text(formData.get("musicPolicy")),
+    cancellationPolicy: text(formData.get("cancellationPolicy")),
+    cancellationTerms: text(formData.get("cancellationTerms")),
+    depositAmount: text(formData.get("depositAmount")),
+    cleaningFee: text(formData.get("cleaningFee")),
+    // Case à cocher : absente du FormData quand elle n'est pas cochée.
+    petsAllowed: formData.get("petsAllowed") !== null,
     equipments,
     services,
     rates: readRates(formData),
