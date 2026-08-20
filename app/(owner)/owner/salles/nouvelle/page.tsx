@@ -2,17 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { RoomForm } from "@/components/owner/RoomForm";
-import { getRoomFormOptions } from "@/lib/owner/rooms";
 
 // Route /owner/salles/nouvelle — protégée, rôle OWNER.
 export const metadata: Metadata = { title: "Ajouter une salle" };
 
-export default async function Page() {
-  // Aucune donnée propre au propriétaire ici : le formulaire ne dépend que des
-  // référentiels. La propriété est établie par l'action serveur, à partir de la
-  // session — jamais d'un champ du formulaire.
-  const options = await getRoomFormOptions();
-
+// Aucune donnée propre au propriétaire ici, et plus aucune lecture en base : les
+// référentiels du formulaire sont tenus dans le code. La propriété est établie
+// par l'action serveur à partir de la session, jamais d'un champ du formulaire.
+export default function Page() {
   return (
     <div className="mx-auto max-w-3xl">
       <Link
@@ -34,7 +31,7 @@ export default async function Page() {
       </header>
 
       <div className="mt-6">
-        <RoomForm options={options} />
+        <RoomForm />
       </div>
     </div>
   );

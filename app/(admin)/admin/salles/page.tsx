@@ -154,6 +154,7 @@ export default async function Page({ searchParams }: PageProps) {
                 key={room.id}
                 room={room}
                 highlighted={room.id === searchParams.salle}
+                ownerFilter={ownerId}
               />
             ))}
           </div>

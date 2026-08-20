@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ModerationAction } from "@prisma/client";
 import { History } from "lucide-react";
 import type { ModerationEntry } from "@/lib/admin/rooms";
@@ -81,9 +82,12 @@ export function ModerationHistoryTable({
                   <span className="flex items-center gap-3">
                     <RoomThumbnail src={entry.room.photoUrl} />
                     <span className="min-w-0">
-                      <span className="block truncate text-gray-900">
+                      <Link
+                        href={`/admin/salles/${entry.room.id}`}
+                        className="block truncate text-gray-900 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                      >
                         {entry.room.name}
-                      </span>
+                      </Link>
                       <span className="block truncate text-xs font-normal text-gray-400">
                         {entry.room.city} · {entry.room.ownerName}
                       </span>

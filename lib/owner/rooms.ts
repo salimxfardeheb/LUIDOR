@@ -93,39 +93,12 @@ export async function listOwnerRoomOptions(
   });
 }
 
-/**
- * Référentiels du formulaire salle chargés depuis la base.
- *
- * Les catégories n'en font plus partie : elles sont tenues dans le code
- * (`lib/rooms/categories.ts`) et le formulaire les affiche sans requête, ce qui
- * lui évite de dépendre de l'état de la base pour s'afficher.
+/*
+ * Le formulaire salle ne charge plus aucun référentiel : catégories,
+ * équipements et prestations sont tenus dans le code (`lib/rooms/*.ts`) et
+ * l'action serveur crée la ligne manquante au premier usage d'un libellé. Il
+ * n'y a donc plus de `getRoomFormOptions()`.
  */
-export interface RoomFormOptions {
-  equipments: { id: string; name: string }[];
-  services: { id: string; name: string; price: number }[];
-}
-
-/** Référentiels proposés par le formulaire salle. */
-export async function getRoomFormOptions(): Promise<RoomFormOptions> {
-  const [equipments, services] = await Promise.all([
-    prisma.equipment.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
-    prisma.service.findMany({
-      select: { id: true, name: true, price: true },
-      orderBy: { name: "asc" },
-    }),
-  ]);
-
-  return {
-    equipments,
-    services: services.map((service) => ({
-      ...service,
-      price: Number(service.price),
-    })),
-  };
-}
 
 /** Valeurs de préremplissage du formulaire d'édition. */
 export interface RoomFormValues {
@@ -140,8 +113,10 @@ export interface RoomFormValues {
   capacityMax: number;
   basePrice: number;
   status: RoomStatus;
-  equipmentIds: string[];
-  serviceIds: string[];
+  /** Équipements retenus, avec la précision saisie pour cette salle. */
+  equipments: { name: string; detail: string | null }[];
+  /** Libellés des prestations retenues. */
+  serviceNames: string[];
   photos: { id: string; url: string }[];
 }
 
@@ -178,8 +153,11 @@ export async function getOwnerRoomForEdit(
       capacityMax: true,
       basePrice: true,
       status: true,
-      equipments: { select: { equipmentId: true } },
-      services: { select: { serviceId: true } },
+      equipments: {
+        select: { detail: true, equipment: { select: { name: true } } },
+        orderBy: { equipment: { name: "asc" } },
+      },
+      services: { select: { service: { select: { name: true } } } },
       photos: {
         select: { id: true, url: true },
         orderBy: { position: "asc" },
@@ -210,8 +188,11 @@ export async function getOwnerRoomForEdit(
       capacityMax: room.capacityMax,
       basePrice: Number(room.basePrice),
       status: room.status,
-      equipmentIds: room.equipments.map((link) => link.equipmentId),
-      serviceIds: room.services.map((link) => link.serviceId),
+      equipments: room.equipments.map((link) => ({
+        name: link.equipment.name,
+        detail: link.detail,
+      })),
+      serviceNames: room.services.map((link) => link.service.name),
       photos: room.photos,
     },
   };

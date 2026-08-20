@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Ban, Images, MapPin, Users } from "lucide-react";
+import { Ban, FileText, Images, MapPin, Users } from "lucide-react";
 import type { PendingRoom } from "@/lib/admin/rooms";
 import { RoomModerationActions } from "@/components/admin/RoomModerationActions";
 import { Alert } from "@/components/ui/Alert";
@@ -24,11 +24,21 @@ const OVERDUE_DAYS = 3;
 export function PendingRoomCard({
   room,
   highlighted = false,
+  ownerFilter = null,
 }: {
   room: PendingRoom;
   /** Dossier ciblé par un lien entrant (`?salle=…`), mis en évidence. */
   highlighted?: boolean;
+  /**
+   * Filtre actif de la file, transmis au dossier pour que le retour ramène la
+   * liste dans l'état où l'utilisateur l'avait laissée.
+   */
+  ownerFilter?: string | null;
 }) {
+  const detailHref = ownerFilter
+    ? `/admin/salles/${room.id}?proprietaire=${encodeURIComponent(ownerFilter)}`
+    : `/admin/salles/${room.id}`;
+
   return (
     <Card
       id={`salle-${room.id}`}
@@ -44,7 +54,12 @@ export function PendingRoomCard({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="truncate text-base font-semibold text-gray-900">
-                {room.name}
+                <Link
+                  href={detailHref}
+                  className="underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+                >
+                  {room.name}
+                </Link>
               </h3>
               <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-gray-500">
                 <MapPin aria-hidden className="h-4 w-4 text-secondary" />
@@ -91,7 +106,14 @@ export function PendingRoomCard({
           )}
         </div>
 
-        <div className="lg:border-l lg:border-gray-200 lg:pl-5">
+        <div className="flex flex-col items-center justify-between gap-3 lg:border-l lg:border-gray-200 lg:pl-5">
+          <Link
+            href={detailHref}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-secondary transition-colors hover:text-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <FileText aria-hidden className="h-4 w-4" />
+            Voir les detailles
+          </Link>
           <RoomModerationActions roomId={room.id} roomName={room.name} />
         </div>
       </article>

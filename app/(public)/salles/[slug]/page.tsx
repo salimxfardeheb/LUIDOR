@@ -277,11 +277,13 @@ function CalendarSkeleton() {
   );
 }
 
-function equipmentChips(equipments: string[]): ChipItem[] {
-  return equipments.map((name) => ({
-    key: name,
-    label: name,
-    icon: equipmentIcon(name),
+function equipmentChips(equipments: RoomDetail["equipments"]): ChipItem[] {
+  return equipments.map((equipment) => ({
+    key: equipment.name,
+    label: equipment.name,
+    icon: equipmentIcon(equipment.name),
+    // `?? undefined` : `ChipItem.detail` est optionnel, pas nullable.
+    detail: equipment.detail ?? undefined,
   }));
 }
 

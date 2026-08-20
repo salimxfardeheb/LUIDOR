@@ -77,7 +77,8 @@ export interface RoomDetail {
   petsAllowed: boolean;
   wheelchairAccess: boolean;
   photos: string[];
-  equipments: string[];
+  /** Équipements de la salle, avec la précision saisie par le propriétaire. */
+  equipments: { name: string; detail: string | null }[];
   services: { id: string; name: string; price: number }[];
   rating: number | null;
   reviewCount: number;
@@ -101,7 +102,7 @@ const ROOM_DETAIL_INCLUDE = {
   },
   photos: { select: { url: true }, orderBy: { position: "asc" } },
   equipments: {
-    select: { equipment: { select: { name: true } } },
+    select: { detail: true, equipment: { select: { name: true } } },
     orderBy: { equipment: { name: "asc" } },
   },
   services: {
@@ -212,7 +213,10 @@ export async function getRoomDetail(id: string): Promise<RoomDetail | null> {
     petsAllowed: room.petsAllowed,
     wheelchairAccess: room.wheelchairAccess,
     photos: room.photos.map((photo) => photo.url),
-    equipments: room.equipments.map((link) => link.equipment.name),
+    equipments: room.equipments.map((link) => ({
+      name: link.equipment.name,
+      detail: link.detail,
+    })),
     services: room.services.map((link) => ({
       id: link.service.id,
       name: link.service.name,

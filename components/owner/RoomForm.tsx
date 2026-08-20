@@ -9,7 +9,7 @@ import {
   updateRoom,
   type RoomFormState,
 } from "@/actions/owner-rooms";
-import { CheckboxCardGroup } from "@/components/owner/CheckboxCardGroup";
+import { EquipmentField } from "@/components/owner/EquipmentField";
 import {
   PhotoUploadField,
   type ExistingPhoto,
@@ -22,10 +22,21 @@ import { fieldAria, FormField, FormSection } from "@/components/ui/FormField";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { formatPrice } from "@/lib/format";
-import type { RoomFormOptions, RoomFormValues } from "@/lib/owner/rooms";
+import type { RoomFormValues } from "@/lib/owner/rooms";
 import { CATEGORY_OPTIONS } from "@/lib/rooms/categories";
 import { ROOM_LIMITS, type FieldErrors } from "@/lib/rooms/schemas";
+import { ROOM_SERVICES } from "@/lib/rooms/services";
 import { WILAYA_OPTIONS } from "@/lib/wilayas";
+
+/**
+ * Prestations proposées, avec leur tarif indicatif. Le tableau est constant :
+ * il est construit au chargement du module, pas à chaque rendu.
+ */
+const SERVICE_OPTIONS = ROOM_SERVICES.map((service) => ({
+  value: service.name,
+  hint:
+    service.price > 0 ? `À partir de ${formatPrice(service.price)}` : "Sur devis",
+}));
 
 /**
  * Formulaire salle, commun à la création et à la modification.
@@ -40,10 +51,8 @@ import { WILAYA_OPTIONS } from "@/lib/wilayas";
  * redirige elle-même vers la liste avec le drapeau de confirmation.
  */
 export function RoomForm({
-  options,
   room,
 }: {
-  options: RoomFormOptions;
   /** Absent en création. */
   room?: RoomFormValues;
 }) {
@@ -309,36 +318,42 @@ export function RoomForm({
 
       <FormSection
         title="Équipements"
-        description="Ce que la salle met à disposition sans supplément."
+        description="Ce que la salle met à disposition sans supplément. Précisez ce qui mérite de l'être : nombre de places de parking, surface de la terrasse…"
       >
-        <CheckboxCardGroup
-          name="equipmentIds"
-          options={options.equipments.map((equipment) => ({
-            id: equipment.id,
-            label: equipment.name,
-          }))}
-          defaultSelected={room?.equipmentIds}
-          emptyLabel="Aucun équipement n'est référencé pour le moment."
-        />
+        {/*
+          Liste tenue dans le code (`lib/rooms/equipments.ts`) : les cases
+          s'affichent sans dépendre de la table `equipments`, que l'action
+          serveur alimente au premier usage de chaque libellé. Chaque équipement
+          retenu peut porter une précision propre à la salle, et le propriétaire
+          peut en ajouter qui ne figurent pas au référentiel.
+        */}
+        <EquipmentField defaultValues={room?.equipments} />
       </FormSection>
 
       <FormSection
         title="Services proposés"
         description="Prestations facturées en supplément, que vous pouvez organiser pour le client."
       >
-        <CheckboxCardGroup
-          name="serviceIds"
-          options={options.services.map((service) => ({
-            id: service.id,
-            label: service.name,
-            detail:
-              service.price > 0
-                ? `À partir de ${formatPrice(service.price)}`
-                : "Sur devis",
-          }))}
-          defaultSelected={room?.serviceIds}
-          emptyLabel="Aucun service n'est référencé pour le moment."
-        />
+        <FormField
+          id="serviceNames"
+          label="Prestations"
+          error={error("serviceNames")}
+          hint="Choisissez dans la liste, ou saisissez une prestation que vous êtes seul à proposer pour l'ajouter. Les tarifs indiqués sont ceux affichés par défaut sur la fiche ; une prestation que vous ajoutez apparaît « sur devis »."
+        >
+          <MultiCombobox
+            id="serviceNames"
+            name="serviceNames"
+            options={SERVICE_OPTIONS}
+            defaultValues={room?.serviceNames}
+            placeholder="Traiteur, photographe…"
+            max={ROOM_LIMITS.services.max}
+            emptyLabel="Aucune prestation ne correspond."
+            {...fieldAria("serviceNames", {
+              hint: true,
+              error: error("serviceNames"),
+            })}
+          />
+        </FormField>
       </FormSection>
 
       {!isEdit && (

@@ -7,6 +7,8 @@ import { cn, normalizeText } from "@/lib/utils";
 export interface MultiComboboxOption {
   /** Libellé affiché et valeur soumise. */
   value: string;
+  /** Complément affiché à droite de la ligne (tarif indicatif, par exemple). */
+  hint?: string;
 }
 
 /**
@@ -291,6 +293,9 @@ export function MultiCombobox({
           ) : (
             rows.map((value, index) => {
               const isCreation = creation !== null && index === rows.length - 1;
+              const hint = isCreation
+                ? undefined
+                : options.find((option) => option.value === value)?.hint;
               const checked = selected.has(normalizeText(value));
               const active = index === highlighted;
               const disabled = full && !checked && !isCreation;
@@ -330,7 +335,12 @@ export function MultiCombobox({
                           checked ? "opacity-100" : "opacity-0"
                         )}
                       />
-                      {value}
+                      <span className="flex-1">{value}</span>
+                      {hint && (
+                        <span className="shrink-0 text-xs text-gray-400">
+                          {hint}
+                        </span>
+                      )}
                     </>
                   )}
                 </li>

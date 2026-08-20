@@ -335,6 +335,12 @@ model Equipment {
 model RoomEquipment {
   roomId      String
   equipmentId String
+  /// Précision propre à cette salle (« 120 places », « Fibre 100 Mb/s »).
+  ///
+  /// Portée par le rattachement et non par `Equipment`, qui est un référentiel
+  /// partagé par toutes les salles : le nombre de places de parking d'une salle
+  /// n'a aucune raison de s'appliquer aux autres.
+  detail      String?
 
   room      Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
   equipment Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
@@ -345,7 +351,9 @@ model RoomEquipment {
 
 model Service {
   id    String  @id @default(cuid())
-  name  String
+  /// Unique : c'est le nom qui identifie une prestation. Le formulaire salle
+  /// n'envoie que des libellés et crée la ligne manquante au premier usage.
+  name  String  @unique
   price Decimal @db.Decimal(10, 2)
 
   rooms RoomService[]

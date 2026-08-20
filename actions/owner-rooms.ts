@@ -10,9 +10,14 @@ import {
   findCategory,
 } from "@/lib/rooms/categories";
 import {
+  CUSTOM_SERVICE_PRICE,
+  findService,
+} from "@/lib/rooms/services";
+import {
   parsePhotoFiles,
   parseRoomForm,
   type FieldErrors,
+  type RoomInput,
 } from "@/lib/rooms/schemas";
 import {
   deleteStoredPhoto,
@@ -31,16 +36,18 @@ import {
  */
 
 /**
- * Traduit les libellés de catégories du formulaire en identifiants `Category`.
+ * Traduit les libellés du formulaire en identifiants de référentiel.
  *
- * La liste proposée au propriétaire est tenue dans le code, pas en base : elle
- * peut donc désigner une catégorie qui n'a encore jamais servi, et le
- * propriétaire peut en saisir une qui n'y figure pas du tout. L'`upsert` sur
- * `name` (unique) couvre les deux cas et reste rejouable si deux salles sont
- * enregistrées en même temps avec la même catégorie neuve.
+ * Les listes proposées au propriétaire sont tenues dans le code, pas en base :
+ * elles désignent souvent une ligne qui n'a encore jamais servi, et le
+ * propriétaire peut saisir une catégorie ou une prestation qui n'y figure pas
+ * du tout. L'`upsert` sur `name` (unique dans les trois tables) couvre les deux
+ * cas et reste rejouable si deux salles sont enregistrées en même temps avec le
+ * même libellé neuf.
  *
- * Exécuté dans la transaction de la salle : une salle qui n'aboutit pas ne doit
- * pas laisser derrière elle une catégorie que personne n'utilise.
+ * Ces résolutions s'exécutent dans la transaction de la salle : une salle qui
+ * n'aboutit pas ne doit pas laisser derrière elle des référentiels que personne
+ * n'utilise.
  */
 async function resolveCategoryIds(
   tx: Prisma.TransactionClient,
@@ -63,6 +70,59 @@ async function resolveCategoryIds(
     });
 
     ids.push(category.id);
+  }
+
+  return ids;
+}
+
+/**
+ * La précision (« 120 places ») suit le rattachement et non l'équipement : elle
+ * est renvoyée telle quelle avec l'identifiant, pour que la salle l'écrive dans
+ * sa propre ligne `RoomEquipment`.
+ */
+async function resolveEquipmentLinks(
+  tx: Prisma.TransactionClient,
+  equipments: RoomInput["equipments"]
+): Promise<{ equipmentId: string; detail: string | null }[]> {
+  const links: { equipmentId: string; detail: string | null }[] = [];
+
+  for (const { name, detail } of equipments) {
+    const equipment = await tx.equipment.upsert({
+      where: { name },
+      update: {},
+      create: { name },
+      select: { id: true },
+    });
+
+    links.push({ equipmentId: equipment.id, detail });
+  }
+
+  return links;
+}
+
+/**
+ * Le prix d'une prestation appartient à la ligne `Service`, partagée par toutes
+ * les salles : il n'est donc jamais réécrit ici. Une prestation ajoutée par un
+ * propriétaire naît à 0, ce que la fiche affiche « Sur devis » — le tarif reste
+ * à négocier, et une saisie individuelle n'a pas à fixer un prix de plateforme.
+ */
+async function resolveServiceIds(
+  tx: Prisma.TransactionClient,
+  names: string[]
+): Promise<string[]> {
+  const ids: string[] = [];
+
+  for (const name of names) {
+    const known = findService(name);
+
+    const service = await tx.service.upsert({
+      where: { name },
+      update: {},
+      create: { name, price: known ? known.price : CUSTOM_SERVICE_PRICE },
+      select: { id: true },
+    });
+
+    ids.push(service.id);
   }
 
   return ids;
@@ -178,7 +238,11 @@ async function create(formData: FormData): Promise<RoomActionResult> {
 
   try {
     const room = await prisma.$transaction(async (tx) => {
+      // Séquentiel : les requêtes d'une transaction interactive partagent une
+      // seule connexion, les paralléliser n'apporterait rien de sûr.
       const categoryIds = await resolveCategoryIds(tx, data.categoryNames);
+      const equipmentLinks = await resolveEquipmentLinks(tx, data.equipments);
+      const serviceIds = await resolveServiceIds(tx, data.serviceNames);
 
       return tx.room.create({
         data: {
@@ -198,10 +262,10 @@ async function create(formData: FormData): Promise<RoomActionResult> {
             create: categoryIds.map((categoryId) => ({ categoryId })),
           },
           equipments: {
-            create: data.equipmentIds.map((equipmentId) => ({ equipmentId })),
+            create: equipmentLinks,
           },
           services: {
-            create: data.serviceIds.map((serviceId) => ({ serviceId })),
+            create: serviceIds.map((serviceId) => ({ serviceId })),
           },
         },
         select: { id: true },
@@ -300,7 +364,11 @@ async function update(formData: FormData): Promise<RoomActionResult> {
      * rattache, et le tout doit échouer ensemble.
      */
     await prisma.$transaction(async (tx) => {
+      // Séquentiel : les requêtes d'une transaction interactive partagent une
+      // seule connexion, les paralléliser n'apporterait rien de sûr.
       const categoryIds = await resolveCategoryIds(tx, data.categoryNames);
+      const equipmentLinks = await resolveEquipmentLinks(tx, data.equipments);
+      const serviceIds = await resolveServiceIds(tx, data.serviceNames);
 
       await tx.roomCategory.deleteMany({ where: { roomId } });
       await tx.roomEquipment.deleteMany({ where: { roomId } });
@@ -321,10 +389,10 @@ async function update(formData: FormData): Promise<RoomActionResult> {
             create: categoryIds.map((categoryId) => ({ categoryId })),
           },
           equipments: {
-            create: data.equipmentIds.map((equipmentId) => ({ equipmentId })),
+            create: equipmentLinks,
           },
           services: {
-            create: data.serviceIds.map((serviceId) => ({ serviceId })),
+            create: serviceIds.map((serviceId) => ({ serviceId })),
           },
         },
       });

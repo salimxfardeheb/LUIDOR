@@ -38,6 +38,7 @@ const roomIdSchema = z.string().min(1);
 /** Recharge les vues où la décision se voit. */
 function revalidateModeration(roomId: string) {
   revalidatePath(ADMIN_ROOMS_PATH);
+  revalidatePath(`${ADMIN_ROOMS_PATH}/${roomId}`);
   revalidatePath("/admin/dashboard");
   revalidatePath("/admin/proprietaires");
   // Une salle validée entre au catalogue public, une salle rejetée n'y est

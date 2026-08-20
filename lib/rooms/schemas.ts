@@ -1,6 +1,8 @@
 import { z } from "zod";
 
 import { findCategory } from "@/lib/rooms/categories";
+import { findEquipment } from "@/lib/rooms/equipments";
+import { findService } from "@/lib/rooms/services";
 import { normalizeText } from "@/lib/utils";
 import { findWilaya } from "@/lib/wilayas";
 
@@ -18,9 +20,13 @@ export const ROOM_LIMITS = {
   /** Wilaya : seule la borne haute sert encore, la valeur vient d'un référentiel fermé. */
   city: { max: 80 },
   address: { min: 5, max: 200 },
-  /** Libellé d'une catégorie saisie à la main, et nombre de catégories par salle. */
-  category: { min: 3, max: 40 },
+  /** Libellé choisi dans un référentiel ou saisi à la main. */
+  label: { min: 3, max: 40 },
+  /** Précision libre attachée à un équipement (« 120 places »). */
+  detail: { max: 60 },
   categories: { max: 9 },
+  equipments: { max: 30 },
+  services: { max: 20 },
   capacity: { min: 1, max: 100_000 },
   price: { min: 1, max: 100_000_000 },
 } as const;
@@ -42,6 +48,34 @@ export const PHOTO_ACCEPT = PHOTO_LIMITS.types.join(",");
 function text(value: FormDataEntryValue | null): string {
   return typeof value === "string" ? value.trim() : "";
 }
+
+/**
+ * Nom du champ portant la précision d'un équipement.
+ *
+ * La clé dérive du libellé plutôt que de la position, pour que les précisions
+ * ne puissent pas se décaler d'un équipement à l'autre — le formulaire et
+ * l'action se partagent donc cette fonction.
+ */
+export function equipmentDetailField(name: string): string {
+  return `equipmentDetail:${name}`;
+}
+
+/**
+ * Libellé de référentiel : catégorie, équipement ou prestation. Les trois
+ * champs voyagent en clair — le formulaire n'envoie plus d'identifiants — donc
+ * ils partagent les mêmes bornes.
+ */
+const label = (subject: string) =>
+  z
+    .string()
+    .min(
+      ROOM_LIMITS.label.min,
+      `Un nom de ${subject} doit contenir au moins ${ROOM_LIMITS.label.min} caractères.`
+    )
+    .max(
+      ROOM_LIMITS.label.max,
+      `Un nom de ${subject} est limité à ${ROOM_LIMITS.label.max} caractères.`
+    );
 
 const positiveIntFromForm = (label: string) =>
   z
@@ -101,18 +135,7 @@ export const roomInputSchema = z
      * les cartes et la fiche.
      */
     categoryNames: z
-      .array(
-        z
-          .string()
-          .min(
-            ROOM_LIMITS.category.min,
-            "Un nom de catégorie doit contenir au moins 3 caractères."
-          )
-          .max(
-            ROOM_LIMITS.category.max,
-            "Un nom de catégorie est limité à 40 caractères."
-          )
-      )
+      .array(label("catégorie"))
       .min(1, "Choisissez au moins une catégorie.")
       .max(
         ROOM_LIMITS.categories.max,
@@ -139,8 +162,38 @@ export const roomInputSchema = z
       .refine((value) => value <= ROOM_LIMITS.price.max, {
         message: "Le prix de base est irréaliste.",
       }),
-    equipmentIds: z.array(z.string().min(1)),
-    serviceIds: z.array(z.string().min(1)),
+    /**
+     * Équipements et leur précision éventuelle. La précision appartient à la
+     * salle (`RoomEquipment.detail`), pas à l'équipement : « 120 places » ne
+     * vaut que pour ce parking-là.
+     */
+    equipments: z
+      .array(
+        z.object({
+          name: label("équipement"),
+          detail: z
+            .string()
+            .max(
+              ROOM_LIMITS.detail.max,
+              `Une précision est limitée à ${ROOM_LIMITS.detail.max} caractères.`
+            )
+            .nullable(),
+        })
+      )
+      .max(
+        ROOM_LIMITS.equipments.max,
+        `${ROOM_LIMITS.equipments.max} équipements au maximum.`
+      ),
+    /**
+     * Prestations : le propriétaire peut en saisir une absente du référentiel,
+     * l'action serveur crée alors la ligne `Service` correspondante.
+     */
+    serviceNames: z
+      .array(label("prestation"))
+      .max(
+        ROOM_LIMITS.services.max,
+        `${ROOM_LIMITS.services.max} prestations au maximum.`
+      ),
   })
   .refine((data) => data.capacityMin <= data.capacityMax, {
     path: ["capacityMax"],
@@ -158,21 +211,27 @@ export type ParseResult<T> =
   | { ok: false; message: string; fieldErrors: FieldErrors };
 
 /**
- * Libellés de catégories reçus du formulaire : espaces normalisés, orthographe
- * ramenée à celle du référentiel quand le libellé y figure, et dédoublonnage
- * insensible à la casse. Sans lui, « mariage » et « Mariage » créeraient deux
- * rattachements — et deux lignes `Category` distinctes.
+ * Libellés reçus du formulaire : espaces normalisés, orthographe ramenée à
+ * celle du référentiel quand le libellé y figure, et dédoublonnage insensible à
+ * la casse. Sans cela, « traiteur » et « Traiteur » produiraient deux
+ * rattachements — et deux lignes distinctes en base.
+ *
+ * `canonical` renvoie la forme officielle d'un libellé connu, ou `null` pour
+ * une saisie libre, qui est alors conservée telle quelle.
  */
-function readCategoryNames(formData: FormData): string[] {
+function readLabels(
+  formData: FormData,
+  field: string,
+  canonical: (value: string) => string | null
+): string[] {
   const seen = new Set<string>();
   const names: string[] = [];
 
-  for (const entry of formData.getAll("categoryNames")) {
+  for (const entry of formData.getAll(field)) {
     const raw = text(entry).replace(/\s+/g, " ");
     if (!raw) continue;
 
-    const known = findCategory(raw);
-    const name = known ? known.name : raw;
+    const name = canonical(raw) ?? raw;
     const key = normalizeText(name);
 
     if (seen.has(key)) continue;
@@ -183,6 +242,38 @@ function readCategoryNames(formData: FormData): string[] {
   return names;
 }
 
+/**
+ * Équipements retenus, avec leur précision. Même nettoyage que `readLabels`,
+ * plus la lecture du champ de précision associé à chaque libellé — lu sur le
+ * libellé **brut**, celui que le formulaire a effectivement envoyé, avant sa
+ * remise à l'orthographe du référentiel.
+ */
+function readEquipments(
+  formData: FormData
+): { name: string; detail: string | null }[] {
+  const seen = new Set<string>();
+  const equipments: { name: string; detail: string | null }[] = [];
+
+  for (const entry of formData.getAll("equipmentNames")) {
+    const raw = text(entry).replace(/\s+/g, " ");
+    if (!raw) continue;
+
+    const name = findEquipment(raw)?.name ?? raw;
+    const key = normalizeText(name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const detail = text(formData.get(equipmentDetailField(raw))).replace(
+      /\s+/g,
+      " "
+    );
+
+    equipments.push({ name, detail: detail || null });
+  }
+
+  return equipments;
+}
+
 /** Extrait les champs « salle » d'un FormData et les valide. */
 export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
   const parsed = roomInputSchema.safeParse({
@@ -190,16 +281,20 @@ export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
     description: text(formData.get("description")),
     city: text(formData.get("city")),
     address: text(formData.get("address")),
-    categoryNames: readCategoryNames(formData),
+    categoryNames: readLabels(
+      formData,
+      "categoryNames",
+      (value) => findCategory(value)?.name ?? null
+    ),
     capacityMin: text(formData.get("capacityMin")),
     capacityMax: text(formData.get("capacityMax")),
     basePrice: text(formData.get("basePrice")),
-    equipmentIds: formData
-      .getAll("equipmentIds")
-      .filter((value): value is string => typeof value === "string"),
-    serviceIds: formData
-      .getAll("serviceIds")
-      .filter((value): value is string => typeof value === "string"),
+    equipments: readEquipments(formData),
+    serviceNames: readLabels(
+      formData,
+      "serviceNames",
+      (value) => findService(value)?.name ?? null
+    ),
   });
 
   if (parsed.success) return { ok: true, data: parsed.data };

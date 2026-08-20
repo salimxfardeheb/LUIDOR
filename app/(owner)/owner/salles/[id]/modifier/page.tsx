@@ -7,7 +7,7 @@ import { ROOM_STATUS, RoomStatusBadge } from "@/components/owner/RoomStatusBadge
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { auth } from "@/lib/auth";
-import { getOwnerRoomForEdit, getRoomFormOptions } from "@/lib/owner/rooms";
+import { getOwnerRoomForEdit } from "@/lib/owner/rooms";
 
 // Route /owner/salles/[id]/modifier — protégée, rôle OWNER.
 export const metadata: Metadata = { title: "Modifier la salle" };
@@ -23,10 +23,7 @@ export default async function Page({ params }: { params: { id: string } }) {
     );
   }
 
-  const [access, options] = await Promise.all([
-    getOwnerRoomForEdit(params.id, session.user.id),
-    getRoomFormOptions(),
-  ]);
+  const access = await getOwnerRoomForEdit(params.id, session.user.id);
 
   // Identifiant inconnu : 404, avec le vrai code HTTP.
   if (!access.ok && access.reason === "not-found") notFound();
@@ -73,7 +70,7 @@ export default async function Page({ params }: { params: { id: string } }) {
       )}
 
       <div className="mt-6">
-        <RoomForm options={options} room={room} />
+        <RoomForm room={room} />
       </div>
     </div>
   );

@@ -221,3 +221,203 @@ export async function listModerationHistory(
     },
   }));
 }
+
+/**
+ * Dossier complet d'une salle, pour `/admin/salles/[id]`.
+ *
+ * Contrairement à la file d'attente, cette lecture ne filtre pas sur le statut :
+ * l'historique de modération renvoie vers des salles déjà validées, désactivées
+ * ou refusées, et l'administrateur doit pouvoir les rouvrir.
+ */
+export interface AdminRoomDetail {
+  id: string;
+  name: string;
+  description: string;
+  status: RoomStatus;
+  city: string;
+  district: string | null;
+  address: string;
+  /** Catégorie principale, celle affichée sur les cartes et la fiche. */
+  categoryName: string;
+  /** Toutes les catégories, principale en tête. */
+  categoryNames: string[];
+  capacityMin: number;
+  capacityMax: number;
+  basePrice: number;
+  surfaceM2: number | null;
+  spacesCount: number | null;
+  hasParking: boolean;
+  hasAccommodation: boolean;
+  videoUrl: string | null;
+  openingHours: string | null;
+  musicPolicy: string | null;
+  cancellationPolicy: string | null;
+  cancellationTerms: string | null;
+  depositAmount: number | null;
+  cleaningFee: number | null;
+  petsAllowed: boolean;
+  wheelchairAccess: boolean;
+  photos: string[];
+  /** Équipements et la précision saisie par le propriétaire pour cette salle. */
+  equipments: { name: string; detail: string | null }[];
+  services: { name: string; price: number }[];
+  /** Horodatages ISO. */
+  createdAt: string;
+  updatedAt: string;
+  verifiedAt: string | null;
+  /** Jours écoulés depuis le dépôt : ne compte que tant que le dossier attend. */
+  waitingDays: number;
+  /** Ce que la salle porte déjà : une salle réservée ne se traite pas à la légère. */
+  bookingsCount: number;
+  reviewsCount: number;
+  favoritesCount: number;
+  owner: PendingRoomOwner;
+  /** Toutes les décisions prises sur ce dossier, de la plus récente à la plus ancienne. */
+  moderations: {
+    id: string;
+    action: ModerationAction;
+    reason: string | null;
+    at: string;
+    adminName: string | null;
+  }[];
+}
+
+export async function getAdminRoomDetail(
+  roomId: string
+): Promise<AdminRoomDetail | null> {
+  const room = await prisma.room.findUnique({
+    where: { id: roomId },
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      status: true,
+      city: true,
+      district: true,
+      address: true,
+      capacityMin: true,
+      capacityMax: true,
+      basePrice: true,
+      surfaceM2: true,
+      spacesCount: true,
+      hasParking: true,
+      hasAccommodation: true,
+      videoUrl: true,
+      openingHours: true,
+      musicPolicy: true,
+      cancellationPolicy: true,
+      cancellationTerms: true,
+      depositAmount: true,
+      cleaningFee: true,
+      petsAllowed: true,
+      wheelchairAccess: true,
+      createdAt: true,
+      updatedAt: true,
+      verifiedAt: true,
+      category: { select: { name: true } },
+      categories: { select: { category: { select: { name: true } } } },
+      photos: { select: { url: true }, orderBy: { position: "asc" } },
+      equipments: {
+        select: { detail: true, equipment: { select: { name: true } } },
+        orderBy: { equipment: { name: "asc" } },
+      },
+      services: {
+        select: { service: { select: { name: true, price: true } } },
+        orderBy: { service: { name: "asc" } },
+      },
+      _count: { select: { bookings: true, reviews: true, favorites: true } },
+      owner: {
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phone: true,
+          avatarUrl: true,
+          suspendedAt: true,
+        },
+      },
+      moderations: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          action: true,
+          reason: true,
+          createdAt: true,
+          admin: { select: { fullName: true } },
+        },
+      },
+    },
+  });
+
+  if (!room) return null;
+
+  const activeByOwner = await countActiveRoomsByOwner([room.owner.id]);
+
+  return {
+    id: room.id,
+    name: room.name,
+    description: room.description,
+    status: room.status,
+    city: room.city,
+    district: room.district,
+    address: room.address,
+    categoryName: room.category.name,
+    // La principale en tête, les secondaires ensuite : c'est l'ordre dans
+    // lequel le propriétaire les a saisies dans son formulaire.
+    categoryNames: [
+      room.category.name,
+      ...room.categories
+        .map((link) => link.category.name)
+        .filter((name) => name !== room.category.name),
+    ],
+    capacityMin: room.capacityMin,
+    capacityMax: room.capacityMax,
+    basePrice: Number(room.basePrice),
+    surfaceM2: room.surfaceM2,
+    spacesCount: room.spacesCount,
+    hasParking: room.hasParking,
+    hasAccommodation: room.hasAccommodation,
+    videoUrl: room.videoUrl,
+    openingHours: room.openingHours,
+    musicPolicy: room.musicPolicy,
+    cancellationPolicy: room.cancellationPolicy,
+    cancellationTerms: room.cancellationTerms,
+    depositAmount: room.depositAmount === null ? null : Number(room.depositAmount),
+    cleaningFee: room.cleaningFee === null ? null : Number(room.cleaningFee),
+    petsAllowed: room.petsAllowed,
+    wheelchairAccess: room.wheelchairAccess,
+    photos: room.photos.map((photo) => photo.url),
+    equipments: room.equipments.map((link) => ({
+      name: link.equipment.name,
+      detail: link.detail,
+    })),
+    services: room.services.map((link) => ({
+      name: link.service.name,
+      price: Number(link.service.price),
+    })),
+    createdAt: room.createdAt.toISOString(),
+    updatedAt: room.updatedAt.toISOString(),
+    verifiedAt: room.verifiedAt ? room.verifiedAt.toISOString() : null,
+    waitingDays:
+      room.status === "PENDING" ? daysSince(room.createdAt, new Date()) : 0,
+    bookingsCount: room._count.bookings,
+    reviewsCount: room._count.reviews,
+    favoritesCount: room._count.favorites,
+    owner: {
+      id: room.owner.id,
+      fullName: room.owner.fullName,
+      email: room.owner.email,
+      phone: room.owner.phone,
+      avatarUrl: room.owner.avatarUrl,
+      activeRoomsCount: activeByOwner.get(room.owner.id) ?? 0,
+      suspended: room.owner.suspendedAt !== null,
+    },
+    moderations: room.moderations.map((entry) => ({
+      id: entry.id,
+      action: entry.action,
+      reason: entry.reason,
+      at: entry.createdAt.toISOString(),
+      adminName: entry.admin?.fullName ?? null,
+    })),
+  };
+}
