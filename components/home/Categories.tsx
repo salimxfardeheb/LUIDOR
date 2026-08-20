@@ -16,9 +16,19 @@ export function Categories() {
         action={{ href: "/salles", label: "Voir toutes" }}
       />
 
-      <ul className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9">
+      {/*
+        Flex et non grid : une grille place les cartes de la dernière ligne dans
+        ses premières colonnes, ce qui laisse un trou à droite dès que le nombre
+        de catégories ne tombe pas juste. `justify-center` centre chaque ligne,
+        complète ou non. Les largeurs reproduisent 2, 3, 5 puis 8 cartes par
+        ligne, gouttière déduite.
+      */}
+      <ul className="mt-8 flex flex-wrap justify-center gap-4">
         {CATEGORIES.map(({ name, slug, icon: Icon }) => (
-          <li key={slug}>
+          <li
+            key={slug}
+            className="w-[calc(50%_-_0.5rem)] sm:w-[calc(33.333%_-_0.667rem)] lg:w-[calc(20%_-_0.8rem)] xl:w-[calc(12.5%_-_0.875rem)]"
+          >
             <Link
               href={`/salles?categorie=${slug}`}
               className="group flex aspect-square flex-col items-center justify-center gap-3 rounded-lg border border-gray-200 bg-white p-3 text-center shadow-sm transition-all hover:-translate-y-0.5 hover:border-secondary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 focus-visible:ring-offset-2"

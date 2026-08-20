@@ -93,19 +93,21 @@ export async function listOwnerRoomOptions(
   });
 }
 
+/**
+ * Référentiels du formulaire salle chargés depuis la base.
+ *
+ * Les catégories n'en font plus partie : elles sont tenues dans le code
+ * (`lib/rooms/categories.ts`) et le formulaire les affiche sans requête, ce qui
+ * lui évite de dépendre de l'état de la base pour s'afficher.
+ */
 export interface RoomFormOptions {
-  categories: { id: string; name: string }[];
   equipments: { id: string; name: string }[];
   services: { id: string; name: string; price: number }[];
 }
 
 /** Référentiels proposés par le formulaire salle. */
 export async function getRoomFormOptions(): Promise<RoomFormOptions> {
-  const [categories, equipments, services] = await Promise.all([
-    prisma.category.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    }),
+  const [equipments, services] = await Promise.all([
     prisma.equipment.findMany({
       select: { id: true, name: true },
       orderBy: { name: "asc" },
@@ -117,7 +119,6 @@ export async function getRoomFormOptions(): Promise<RoomFormOptions> {
   ]);
 
   return {
-    categories,
     equipments,
     services: services.map((service) => ({
       ...service,
@@ -133,8 +134,8 @@ export interface RoomFormValues {
   description: string;
   city: string;
   address: string;
-  /** Catégories cochées ; la première est la principale. */
-  categoryIds: string[];
+  /** Libellés des catégories retenues ; le premier est la catégorie principale. */
+  categoryNames: string[];
   capacityMin: number;
   capacityMax: number;
   basePrice: number;
@@ -171,8 +172,8 @@ export async function getOwnerRoomForEdit(
       description: true,
       city: true,
       address: true,
-      categoryId: true,
-      categories: { select: { categoryId: true } },
+      category: { select: { name: true } },
+      categories: { select: { category: { select: { name: true } } } },
       capacityMin: true,
       capacityMax: true,
       basePrice: true,
@@ -199,11 +200,11 @@ export async function getOwnerRoomForEdit(
       address: room.address,
       // La principale d'abord : l'ordre du formulaire détermine laquelle le
       // restera à l'enregistrement.
-      categoryIds: [
-        room.categoryId,
+      categoryNames: [
+        room.category.name,
         ...room.categories
-          .map((link) => link.categoryId)
-          .filter((id) => id !== room.categoryId),
+          .map((link) => link.category.name)
+          .filter((name) => name !== room.category.name),
       ],
       capacityMin: room.capacityMin,
       capacityMax: room.capacityMax,

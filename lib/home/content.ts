@@ -1,45 +1,27 @@
 import {
   BadgeCheck,
   CalendarClock,
-  Cake,
-  Gem,
-  Gift,
   Headphones,
-  Heart,
-  Landmark,
-  Mic,
-  PartyPopper,
-  Presentation,
   ShieldCheck,
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import { ROOM_CATEGORIES, type RoomCategory } from "@/lib/rooms/categories";
 
 /**
  * Contenu éditorial de la page d'accueil.
- *
- * Les catégories reprennent les libellés attendus en base (`categories.name`) :
- * elles servent aussi bien à l'affichage qu'aux liens de filtrage `?categorie=`.
  */
 
-export interface HomeCategory {
-  /** Libellé affiché, aligné sur `Category.name`. */
-  name: string;
-  /** Valeur passée en query param (`/salles?categorie=…`). */
-  slug: string;
-  icon: LucideIcon;
-}
+/**
+ * Les catégories ne sont plus définies ici : elles viennent du référentiel
+ * partagé `lib/rooms/categories.ts`, que le formulaire salle utilise aussi.
+ * Une seule liste à tenir, donc aucune divergence possible entre la grille de
+ * l'accueil, les filtres du catalogue et ce que les propriétaires peuvent
+ * cocher.
+ */
+export type HomeCategory = RoomCategory;
 
-export const CATEGORIES: readonly HomeCategory[] = [
-  { name: "Mariage", slug: "mariage", icon: Gem },
-  { name: "Anniversaire", slug: "anniversaire", icon: Cake },
-  { name: "Fiançailles", slug: "fiancailles", icon: Heart },
-  { name: "Conférence", slug: "conference", icon: Mic },
-  { name: "Séminaire", slug: "seminaire", icon: Presentation },
-  { name: "Soirée privée", slug: "soiree-privee", icon: PartyPopper },
-  { name: "Réception", slug: "reception", icon: Gift },
-  { name: "Événement pro", slug: "evenement-pro", icon: Landmark },
-] as const;
+export const CATEGORIES: readonly HomeCategory[] = ROOM_CATEGORIES;
 
 /** Villes mises en avant. Le nombre de salles est calculé côté serveur. */
 export interface HomeDestination {

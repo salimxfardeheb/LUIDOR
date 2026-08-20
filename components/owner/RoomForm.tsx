@@ -16,12 +16,16 @@ import {
 } from "@/components/owner/PhotoUploadField";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
+import { Combobox } from "@/components/ui/Combobox";
+import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { fieldAria, FormField, FormSection } from "@/components/ui/FormField";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { formatPrice } from "@/lib/format";
 import type { RoomFormOptions, RoomFormValues } from "@/lib/owner/rooms";
+import { CATEGORY_OPTIONS } from "@/lib/rooms/categories";
 import { ROOM_LIMITS, type FieldErrors } from "@/lib/rooms/schemas";
+import { WILAYA_OPTIONS } from "@/lib/wilayas";
 
 /**
  * Formulaire salle, commun à la création et à la modification.
@@ -117,22 +121,29 @@ export function RoomForm({
             />
           </FormField>
 
+          {/*
+            Wilaya choisie dans le référentiel plutôt que saisie librement : la
+            recherche du catalogue filtre sur une égalité de chaîne, et « Alger »,
+            « alger » et « Algers » y créaient jusqu'ici trois villes distinctes.
+          */}
           <FormField
             id="city"
-            label="Ville"
+            label="Wilaya"
             required
             error={error("city")}
+            hint="Tapez les premières lettres ou le numéro de la wilaya, puis choisissez dans la liste."
             className="sm:max-w-xs"
           >
-            <Input
+            <Combobox
               id="city"
               name="city"
+              options={WILAYA_OPTIONS}
               defaultValue={room?.city ?? ""}
               maxLength={ROOM_LIMITS.city.max}
               placeholder="Alger"
-              autoComplete="address-level2"
+              emptyLabel="Aucune wilaya ne correspond."
               required
-              {...fieldAria("city", { error: error("city") })}
+              {...fieldAria("city", { hint: true, error: error("city") })}
             />
           </FormField>
 
@@ -140,42 +151,34 @@ export function RoomForm({
             Sélection multiple : une salle peut convenir à plusieurs types
             d'événement, et elle ressort alors dans chacune des catégories du
             catalogue et de la recherche.
+
+            La liste proposée vient du code (`lib/rooms/categories.ts`), pas de
+            la base : le champ s'affiche toujours, même sur une base neuve. Un
+            libellé absent de la liste peut être ajouté à la volée — l'action
+            serveur crée la ligne `Category` correspondante.
           */}
-          <fieldset>
-            <legend className="text-sm font-medium text-gray-700">
-              Catégories
-              <span aria-hidden className="ml-0.5 text-error">
-                *
-              </span>
-              <span className="sr-only"> (obligatoire)</span>
-            </legend>
-            <p id="categoryIds-hint" className="mt-1 text-xs text-gray-500">
-              Cochez tous les types d&apos;événement que la salle accueille. La
-              première catégorie de la liste sert de catégorie principale,
-              affichée sur votre fiche.
-            </p>
-
-            <div className="mt-3">
-              <CheckboxCardGroup
-                name="categoryIds"
-                options={options.categories.map((category) => ({
-                  id: category.id,
-                  label: category.name,
-                }))}
-                defaultSelected={room?.categoryIds}
-                emptyLabel="Aucune catégorie n'est référencée pour le moment."
-              />
-            </div>
-
-            {error("categoryIds") && (
-              <p
-                id="categoryIds-error"
-                className="mt-2 text-xs font-medium text-error"
-              >
-                {error("categoryIds")}
-              </p>
-            )}
-          </fieldset>
+          <FormField
+            id="categoryNames"
+            label="Catégories"
+            required
+            error={error("categoryNames")}
+            hint={`Tapez pour filtrer, ou saisissez un type d'événement absent de la liste pour l'ajouter. ${ROOM_LIMITS.categories.max} au maximum, la première est la catégorie principale affichée sur votre fiche.`}
+          >
+            <MultiCombobox
+              id="categoryNames"
+              name="categoryNames"
+              options={CATEGORY_OPTIONS}
+              defaultValues={room?.categoryNames}
+              placeholder="Mariage, conférence…"
+              max={ROOM_LIMITS.categories.max}
+              primaryLabel="principale"
+              emptyLabel="Aucune catégorie ne correspond."
+              {...fieldAria("categoryNames", {
+                hint: true,
+                error: error("categoryNames"),
+              })}
+            />
+          </FormField>
 
           <FormField
             id="address"

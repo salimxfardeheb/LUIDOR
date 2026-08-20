@@ -1,5 +1,9 @@
 import { z } from "zod";
 
+import { findCategory } from "@/lib/rooms/categories";
+import { normalizeText } from "@/lib/utils";
+import { findWilaya } from "@/lib/wilayas";
+
 /**
  * Validation d'une salle, partagée par la création et la modification.
  *
@@ -11,8 +15,12 @@ import { z } from "zod";
 export const ROOM_LIMITS = {
   name: { min: 3, max: 120 },
   description: { min: 60, max: 4000 },
-  city: { min: 2, max: 80 },
+  /** Wilaya : seule la borne haute sert encore, la valeur vient d'un référentiel fermé. */
+  city: { max: 80 },
   address: { min: 5, max: 200 },
+  /** Libellé d'une catégorie saisie à la main, et nombre de catégories par salle. */
+  category: { min: 3, max: 40 },
+  categories: { max: 9 },
   capacity: { min: 1, max: 100_000 },
   price: { min: 1, max: 100_000_000 },
 } as const;
@@ -63,22 +71,53 @@ export const roomInputSchema = z
         ROOM_LIMITS.description.max,
         "La description est trop longue (4 000 caractères max)."
       ),
+    /*
+     * La wilaya est choisie dans le référentiel `lib/wilayas.ts`, pas saisie
+     * librement. Le contrôle est refait ici parce qu'une action serveur est un
+     * point d'entrée HTTP : le sélecteur du formulaire n'engage que le
+     * navigateur. La valeur est ensuite ramenée à l'orthographe du référentiel,
+     * pour que les filtres du catalogue — qui comparent des chaînes — ne voient
+     * jamais « alger » et « Alger » comme deux villes différentes.
+     */
     city: z
       .string()
-      .min(ROOM_LIMITS.city.min, "Indiquez la ville.")
-      .max(ROOM_LIMITS.city.max, "Le nom de ville est trop long."),
+      .min(1, "Choisissez la wilaya de la salle.")
+      .max(ROOM_LIMITS.city.max, "Le nom de wilaya est trop long.")
+      .refine((value) => findWilaya(value) !== null, {
+        message: "Choisissez une wilaya dans la liste proposée.",
+      })
+      .transform((value) => findWilaya(value) ?? value),
     address: z
       .string()
       .min(ROOM_LIMITS.address.min, "Indiquez l'adresse complète.")
       .max(ROOM_LIMITS.address.max, "L'adresse est trop longue."),
     /**
-     * Catégories de la salle. La première sert de catégorie principale : c'est
-     * elle qui s'affiche sur les cartes et la fiche.
+     * Catégories de la salle, transmises par **libellé** et non par identifiant :
+     * la liste proposée est tenue dans le code (`lib/rooms/categories.ts`) et un
+     * propriétaire peut en saisir une absente du référentiel. C'est l'action
+     * serveur qui retrouve ou crée la ligne `Category` correspondante.
+     *
+     * La première sert de catégorie principale : c'est elle qui s'affiche sur
+     * les cartes et la fiche.
      */
-    categoryIds: z
-      .array(z.string().min(1))
+    categoryNames: z
+      .array(
+        z
+          .string()
+          .min(
+            ROOM_LIMITS.category.min,
+            "Un nom de catégorie doit contenir au moins 3 caractères."
+          )
+          .max(
+            ROOM_LIMITS.category.max,
+            "Un nom de catégorie est limité à 40 caractères."
+          )
+      )
       .min(1, "Choisissez au moins une catégorie.")
-      .max(9, "Neuf catégories au maximum."),
+      .max(
+        ROOM_LIMITS.categories.max,
+        `${ROOM_LIMITS.categories.max} catégories au maximum.`
+      ),
     capacityMin: positiveIntFromForm("La capacité minimum")
       .refine((value) => value >= ROOM_LIMITS.capacity.min, {
         message: "La capacité minimum doit être d'au moins 1 invité.",
@@ -118,6 +157,32 @@ export type ParseResult<T> =
   | { ok: true; data: T }
   | { ok: false; message: string; fieldErrors: FieldErrors };
 
+/**
+ * Libellés de catégories reçus du formulaire : espaces normalisés, orthographe
+ * ramenée à celle du référentiel quand le libellé y figure, et dédoublonnage
+ * insensible à la casse. Sans lui, « mariage » et « Mariage » créeraient deux
+ * rattachements — et deux lignes `Category` distinctes.
+ */
+function readCategoryNames(formData: FormData): string[] {
+  const seen = new Set<string>();
+  const names: string[] = [];
+
+  for (const entry of formData.getAll("categoryNames")) {
+    const raw = text(entry).replace(/\s+/g, " ");
+    if (!raw) continue;
+
+    const known = findCategory(raw);
+    const name = known ? known.name : raw;
+    const key = normalizeText(name);
+
+    if (seen.has(key)) continue;
+    seen.add(key);
+    names.push(name);
+  }
+
+  return names;
+}
+
 /** Extrait les champs « salle » d'un FormData et les valide. */
 export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
   const parsed = roomInputSchema.safeParse({
@@ -125,9 +190,7 @@ export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
     description: text(formData.get("description")),
     city: text(formData.get("city")),
     address: text(formData.get("address")),
-    categoryIds: formData
-      .getAll("categoryIds")
-      .filter((value): value is string => typeof value === "string" && value !== ""),
+    categoryNames: readCategoryNames(formData),
     capacityMin: text(formData.get("capacityMin")),
     capacityMax: text(formData.get("capacityMax")),
     basePrice: text(formData.get("basePrice")),

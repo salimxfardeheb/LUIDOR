@@ -2,9 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { RoomStatus } from "@prisma/client";
+import type { Prisma, RoomStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireOwnerSession } from "@/lib/owner/guards";
+import {
+  CUSTOM_CATEGORY_ICON_SLUG,
+  findCategory,
+} from "@/lib/rooms/categories";
 import {
   parsePhotoFiles,
   parseRoomForm,
@@ -25,6 +29,44 @@ import {
  * serveur est un point d'entrée HTTP public, le fait que l'UI ne l'expose qu'aux
  * propriétaires ne protège rien.
  */
+
+/**
+ * Traduit les libellés de catégories du formulaire en identifiants `Category`.
+ *
+ * La liste proposée au propriétaire est tenue dans le code, pas en base : elle
+ * peut donc désigner une catégorie qui n'a encore jamais servi, et le
+ * propriétaire peut en saisir une qui n'y figure pas du tout. L'`upsert` sur
+ * `name` (unique) couvre les deux cas et reste rejouable si deux salles sont
+ * enregistrées en même temps avec la même catégorie neuve.
+ *
+ * Exécuté dans la transaction de la salle : une salle qui n'aboutit pas ne doit
+ * pas laisser derrière elle une catégorie que personne n'utilise.
+ */
+async function resolveCategoryIds(
+  tx: Prisma.TransactionClient,
+  names: string[]
+): Promise<string[]> {
+  const ids: string[] = [];
+
+  for (const name of names) {
+    const known = findCategory(name);
+
+    const category = await tx.category.upsert({
+      where: { name },
+      // Rien à mettre à jour : seule l'existence de la ligne compte.
+      update: {},
+      create: {
+        name,
+        iconSlug: known ? known.iconSlug : CUSTOM_CATEGORY_ICON_SLUG,
+      },
+      select: { id: true },
+    });
+
+    ids.push(category.id);
+  }
+
+  return ids;
+}
 
 export type RoomActionResult =
   | { ok: true; roomId: string; message: string }
@@ -135,31 +177,35 @@ async function create(formData: FormData): Promise<RoomActionResult> {
   const { data } = fields;
 
   try {
-    const room = await prisma.room.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        city: data.city,
-        address: data.address,
-        capacityMin: data.capacityMin,
-        capacityMax: data.capacityMax,
-        basePrice: data.basePrice,
-        status: "PENDING",
-        owner: { connect: { id: owner.ownerId } },
-        // La première catégorie cochée devient la principale ; toutes sont
-        // rattachées, y compris celle-ci (invariant de `RoomCategory`).
-        category: { connect: { id: data.categoryIds[0] } },
-        categories: {
-          create: data.categoryIds.map((categoryId) => ({ categoryId })),
+    const room = await prisma.$transaction(async (tx) => {
+      const categoryIds = await resolveCategoryIds(tx, data.categoryNames);
+
+      return tx.room.create({
+        data: {
+          name: data.name,
+          description: data.description,
+          city: data.city,
+          address: data.address,
+          capacityMin: data.capacityMin,
+          capacityMax: data.capacityMax,
+          basePrice: data.basePrice,
+          status: "PENDING",
+          owner: { connect: { id: owner.ownerId } },
+          // La première catégorie retenue devient la principale ; toutes sont
+          // rattachées, y compris celle-ci (invariant de `RoomCategory`).
+          category: { connect: { id: categoryIds[0] } },
+          categories: {
+            create: categoryIds.map((categoryId) => ({ categoryId })),
+          },
+          equipments: {
+            create: data.equipmentIds.map((equipmentId) => ({ equipmentId })),
+          },
+          services: {
+            create: data.serviceIds.map((serviceId) => ({ serviceId })),
+          },
         },
-        equipments: {
-          create: data.equipmentIds.map((equipmentId) => ({ equipmentId })),
-        },
-        services: {
-          create: data.serviceIds.map((serviceId) => ({ serviceId })),
-        },
-      },
-      select: { id: true },
+        select: { id: true },
+      });
     });
 
     // Les photos sont envoyées après la salle : leur dossier porte son id. Si
@@ -248,11 +294,19 @@ async function update(formData: FormData): Promise<RoomActionResult> {
       await Promise.all(toDelete.map((photo) => deleteStoredPhoto(photo)));
     }
 
-    await prisma.$transaction([
-      prisma.roomCategory.deleteMany({ where: { roomId } }),
-      prisma.roomEquipment.deleteMany({ where: { roomId } }),
-      prisma.roomService.deleteMany({ where: { roomId } }),
-      prisma.room.update({
+    /*
+     * Transaction interactive et non tableau d'opérations : les catégories
+     * doivent être résolues — donc créées si besoin — avant que la salle ne s'y
+     * rattache, et le tout doit échouer ensemble.
+     */
+    await prisma.$transaction(async (tx) => {
+      const categoryIds = await resolveCategoryIds(tx, data.categoryNames);
+
+      await tx.roomCategory.deleteMany({ where: { roomId } });
+      await tx.roomEquipment.deleteMany({ where: { roomId } });
+      await tx.roomService.deleteMany({ where: { roomId } });
+
+      await tx.room.update({
         where: { id: roomId },
         data: {
           name: data.name,
@@ -262,9 +316,9 @@ async function update(formData: FormData): Promise<RoomActionResult> {
           capacityMin: data.capacityMin,
           capacityMax: data.capacityMax,
           basePrice: data.basePrice,
-          category: { connect: { id: data.categoryIds[0] } },
+          category: { connect: { id: categoryIds[0] } },
           categories: {
-            create: data.categoryIds.map((categoryId) => ({ categoryId })),
+            create: categoryIds.map((categoryId) => ({ categoryId })),
           },
           equipments: {
             create: data.equipmentIds.map((equipmentId) => ({ equipmentId })),
@@ -273,8 +327,8 @@ async function update(formData: FormData): Promise<RoomActionResult> {
             create: data.serviceIds.map((serviceId) => ({ serviceId })),
           },
         },
-      }),
-    ]);
+      });
+    });
 
     const remaining = await prisma.photo.count({ where: { roomId } });
     await attachPhotos(roomId, photos.data, remaining);
