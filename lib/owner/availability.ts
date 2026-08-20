@@ -30,24 +30,32 @@ export function todayIso(): string {
 }
 
 /**
- * Grille d'un mois pour une salle donnée, ou `null` si la salle n'appartient
- * pas au propriétaire. Le filtre sur `ownerId` est dans la requête : le
- * cloisonnement ne dépend jamais de l'appelant.
+ * Grilles de toute la fenêtre gérable pour une salle, ou `null` si la salle
+ * n'appartient pas au propriétaire. Le filtre sur `ownerId` est dans la
+ * requête : le cloisonnement ne dépend jamais de l'appelant.
+ *
+ * Les douze mois sont lus d'un coup, en deux requêtes sur la plage entière,
+ * plutôt qu'un mois à la demande. C'est ce qui permet au calendrier de changer
+ * de mois **sans repasser par le serveur** : passer de septembre à octobre ne
+ * doit pas rejouer le rendu de toute la page. Le volume est celui d'une année
+ * de dates — quelques centaines de lignes au plus.
  */
-export async function getOwnerRoomMonth(
+export async function getOwnerRoomWindow(
   ownerId: string,
   roomId: string,
-  { year, month, key }: CalendarMonthRef
-): Promise<OwnerCalendarMonth | null> {
+  months: readonly CalendarMonthRef[]
+): Promise<OwnerCalendarMonth[] | null> {
   const room = await prisma.room.findFirst({
     where: { id: roomId, ownerId },
     select: { id: true },
   });
 
-  if (!room) return null;
+  if (!room || months.length === 0) return room ? [] : null;
 
-  const from = new Date(Date.UTC(year, month - 1, 1));
-  const to = new Date(Date.UTC(year, month, 1));
+  const first = months[0];
+  const last = months[months.length - 1];
+  const from = new Date(Date.UTC(first.year, first.month - 1, 1));
+  const to = new Date(Date.UTC(last.year, last.month, 1));
 
   const [availabilities, bookings] = await Promise.all([
     prisma.availability.findMany({
@@ -82,21 +90,24 @@ export async function getOwnerRoomMonth(
   }
 
   const today = todayIso();
-  const dayCount = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-  const days: OwnerCalendarDay[] = Array.from(
-    { length: dayCount },
-    (_, index) => {
-      const date = isoDay(new Date(Date.UTC(year, month - 1, index + 1)));
-      return {
-        date,
-        status: statusByDay.get(date) ?? null,
-        booked: bookedDays.has(date),
-        requested: requestedDays.has(date),
-        past: date < today,
-      };
-    }
-  );
+  return months.map(({ year, month, key }) => {
+    const dayCount = new Date(Date.UTC(year, month, 0)).getUTCDate();
 
-  return { year, month, key, days };
+    const days: OwnerCalendarDay[] = Array.from(
+      { length: dayCount },
+      (_, index) => {
+        const date = isoDay(new Date(Date.UTC(year, month - 1, index + 1)));
+        return {
+          date,
+          status: statusByDay.get(date) ?? null,
+          booked: bookedDays.has(date),
+          requested: requestedDays.has(date),
+          past: date < today,
+        };
+      }
+    );
+
+    return { year, month, key, days };
+  });
 }

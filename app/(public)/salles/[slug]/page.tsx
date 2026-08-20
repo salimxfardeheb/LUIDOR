@@ -73,9 +73,28 @@ export default async function Page({ params }: PageProps) {
         roomName={room.name}
       />
 
+      {/*
+        En-tête pleine largeur, avant les photos : on sait de quelle salle il
+        s'agit — son nom, sa catégorie, sa note, son adresse — avant de regarder
+        les images, et le titre n'est plus enterré sous une galerie qui occupe
+        la moitié de l'écran.
+      */}
+      <div className="mt-4">
+        <RoomHeader
+          name={room.name}
+          categoryName={room.categoryName}
+          verified={room.verified}
+          rating={room.rating}
+          reviewCount={room.reviewCount}
+          city={room.city}
+          district={room.district}
+          address={room.address}
+        />
+      </div>
+
       {/* Galerie et sidebar partagent la même ligne : la carte de réservation
           est visible sans défiler, alignée en haut de la photo principale. */}
-      <div className="mt-5 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
+      <div className="mt-6 grid gap-10 lg:grid-cols-[minmax(0,1fr)_22rem] lg:gap-8">
         {/* Colonne principale */}
         <div className="min-w-0">
           <RoomGallery
@@ -83,19 +102,6 @@ export default async function Page({ params }: PageProps) {
             photos={room.photos}
             videoUrl={room.videoUrl}
           />
-
-          <div className="mt-6">
-            <RoomHeader
-              name={room.name}
-              categoryName={room.categoryName}
-              verified={room.verified}
-              rating={room.rating}
-              reviewCount={room.reviewCount}
-              city={room.city}
-              district={room.district}
-              address={room.address}
-            />
-          </div>
 
           <div className="mt-6">
             <RoomStats
@@ -170,6 +176,7 @@ export default async function Page({ params }: PageProps) {
               basePrice={room.basePrice}
               capacityMin={room.capacityMin}
               capacityMax={room.capacityMax}
+              services={room.services}
               eventTypes={eventTypes}
               defaultEventType={room.categoryName}
             />

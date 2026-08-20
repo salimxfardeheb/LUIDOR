@@ -17,6 +17,7 @@ import { BookingRequestModal } from "@/components/rooms/detail/BookingRequestMod
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { formatNumber, formatPrice } from "@/lib/format";
+import type { RoomDetail } from "@/lib/rooms/detail";
 
 /**
  * Carte de réservation de la sidebar.
@@ -38,6 +39,7 @@ export function BookingCard({
   basePrice,
   capacityMin,
   capacityMax,
+  services,
   eventTypes,
   defaultEventType,
 }: {
@@ -47,6 +49,8 @@ export function BookingCard({
   /** `null` quand la salle n'annonce pas de minimum. */
   capacityMin: number | null;
   capacityMax: number;
+  /** Prestations de la salle, proposées à cocher dans la demande. */
+  services: RoomDetail["services"];
   /** Types d'événement proposés dans la demande (catégories de la plateforme). */
   eventTypes: string[];
   /** Catégorie de la salle, présélectionnée dans la demande. */
@@ -54,6 +58,13 @@ export function BookingCard({
 }) {
   const router = useRouter();
   const { data: session, status } = useSession();
+
+  /*
+   * Une salle des fêtes se loue à la journée neuf fois sur dix : c'est le mode
+   * par défaut, et il n'affiche qu'une date. Le formulaire n'envoie alors aucun
+   * « départ », que l'action serveur ramène au jour d'arrivée.
+   */
+  const [multiDay, setMultiDay] = React.useState(false);
 
   const [pending, setPending] = React.useState(false);
   const [result, setResult] = React.useState<AvailabilityResult | null>(null);
@@ -140,14 +151,26 @@ export function BookingCard({
         onSubmit={handleSubmit}
         className="mt-5 flex flex-col gap-3"
       >
-        <div className="grid grid-cols-2 gap-3">
-          <Field id="arrivee" label="Arrivée" icon={CalendarDays}>
-            <Input id="arrivee" name="arrivee" type="date" required />
-          </Field>
+        <DurationToggle multiDay={multiDay} onChange={setMultiDay} />
+
+        {/*
+          Les dates sont empilées et non côte à côte : dans une colonne de 22rem,
+          deux champs `type="date"` n'ont pas la place d'afficher « jj/mm/aaaa »
+          et leur icône de calendrier, qui finissaient l'un sur l'autre.
+        */}
+        <Field
+          id="arrivee"
+          label={multiDay ? "Arrivée" : "Date de l'événement"}
+          icon={CalendarDays}
+        >
+          <Input id="arrivee" name="arrivee" type="date" required />
+        </Field>
+
+        {multiDay && (
           <Field id="depart" label="Départ" icon={CalendarDays}>
             <Input id="depart" name="depart" type="date" required />
           </Field>
-        </div>
+        )}
 
         <Field id="invites" label="Invités" icon={Users}>
           <Input
@@ -214,6 +237,7 @@ export function BookingCard({
         roomName={roomName}
         capacityMin={capacityMin}
         capacityMax={capacityMax}
+        services={services}
         eventTypes={eventTypes}
         defaults={{
           eventType: defaultEventType,
@@ -223,6 +247,56 @@ export function BookingCard({
         }}
       />
     </section>
+  );
+}
+
+/**
+ * Choix de la durée : une journée, ou une plage de dates.
+ *
+ * Deux boutons plutôt qu'une case à cocher : l'un des deux est toujours vrai,
+ * et `aria-pressed` dit lequel. Basculer sur « une journée » démonte le champ
+ * de départ, qui quitte donc l'envoi — c'est ce que l'action serveur lit comme
+ * « la vérification porte sur un seul jour ».
+ */
+function DurationToggle({
+  multiDay,
+  onChange,
+}: {
+  multiDay: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  const options = [
+    { label: "Une journée", value: false },
+    { label: "Plusieurs jours", value: true },
+  ];
+
+  return (
+    <div
+      role="group"
+      aria-label="Durée de la location"
+      className="grid grid-cols-2 gap-1 rounded-md border border-gray-200 bg-gray-50 p-1"
+    >
+      {options.map((option) => {
+        const active = option.value === multiDay;
+
+        return (
+          <button
+            key={option.label}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(option.value)}
+            className={
+              "rounded-[0.3rem] px-2 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 " +
+              (active
+                ? "bg-white text-primary-900 shadow-xs"
+                : "text-gray-500 hover:text-primary-900")
+            }
+          >
+            {option.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

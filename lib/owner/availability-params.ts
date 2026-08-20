@@ -149,6 +149,24 @@ export function resolveMonthWindow(value?: string): MonthWindow {
   };
 }
 
+/**
+ * Les douze mois gérables, du mois courant au dernier.
+ *
+ * La page les charge tous d'un coup : c'est ce qui permet au calendrier de
+ * changer de mois dans le navigateur, sans rejouer le rendu serveur de la page
+ * entière à chaque flèche.
+ */
+export function editableMonths(): CalendarMonthRef[] {
+  const now = new Date();
+  const first = toRef(
+    new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  );
+
+  return Array.from({ length: CALENDAR_MONTH_SPAN }, (_, offset) =>
+    shiftMonth(first, offset)
+  );
+}
+
 /** Lien vers le calendrier d'une salle sur un mois donné. */
 export function buildAvailabilityHref(roomId: string, month: string): string {
   const params = new URLSearchParams({

@@ -62,6 +62,7 @@ export async function submitBookingRequest(
 
   const { roomId, eventType, guestsCount, contactPhone, contactEmail } =
     parsed.data;
+  const serviceIds = Array.from(new Set(parsed.data.serviceIds));
 
   const eventDate = new Date(`${parsed.data.eventDate}T00:00:00.000Z`);
   if (Number.isNaN(eventDate.getTime())) {
@@ -188,6 +189,20 @@ export async function submitBookingRequest(
       };
     }
 
+    /*
+     * Seules les prestations réellement proposées par cette salle sont retenues.
+     * Le filtre se fait en base, sur le rattachement : un identifiant forgé, ou
+     * celui d'une prestation retirée depuis l'affichage de la page, est ignoré
+     * plutôt que de faire échouer la demande — le client n'y peut rien.
+     */
+    const offered =
+      serviceIds.length === 0
+        ? []
+        : await prisma.roomService.findMany({
+            where: { roomId: room.id, serviceId: { in: serviceIds } },
+            select: { serviceId: true, service: { select: { name: true } } },
+          });
+
     await prisma.booking.create({
       data: {
         clientId: session.user.id,
@@ -198,6 +213,9 @@ export async function submitBookingRequest(
         contactPhone,
         contactEmail,
         status: "EN_ATTENTE",
+        services: {
+          create: offered.map((link) => ({ serviceId: link.serviceId })),
+        },
       },
     });
 
@@ -212,6 +230,7 @@ export async function submitBookingRequest(
       eventType,
       eventDate: formatDate(eventDate),
       guestsCount,
+      services: offered.map((link) => link.service.name),
     });
 
     revalidatePath("/admin/reservations");

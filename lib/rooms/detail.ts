@@ -1,5 +1,6 @@
 import type { Prisma, RateUnit } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { hasEquipment, SUMMARY_EQUIPMENTS } from "@/lib/rooms/equipments";
 import {
   ROOM_SUMMARY_SELECT,
   toRoomSummary,
@@ -201,6 +202,18 @@ export async function getRoomDetail(id: string): Promise<RoomDetail | null> {
     0
   );
 
+  /*
+   * Parking, hébergement et accès PMR sont **relus des équipements**, jamais des
+   * colonnes de `Room` qui les recopient : celles-ci ne sont écrites qu'à
+   * l'enregistrement, et une salle publiée avant cette règle afficherait encore
+   * « Parking : non » au-dessus d'une liste où figure « Parking privé ». La
+   * liste est la déclaration du propriétaire ; le reste n'en est qu'un reflet.
+   */
+  const equipments = room.equipments.map((link) => ({
+    name: link.equipment.name,
+    detail: link.detail,
+  }));
+
   const ratingBreakdown: RatingBucket[] = [5, 4, 3, 2, 1].map((stars) => {
     const count = countByRating.get(stars) ?? 0;
     return {
@@ -225,8 +238,11 @@ export async function getRoomDetail(id: string): Promise<RoomDetail | null> {
     basePrice: Number(room.basePrice),
     surfaceM2: room.surfaceM2,
     spacesCount: room.spacesCount,
-    hasParking: room.hasParking,
-    hasAccommodation: room.hasAccommodation,
+    hasParking: hasEquipment(equipments, SUMMARY_EQUIPMENTS.parking),
+    hasAccommodation: hasEquipment(
+      equipments,
+      SUMMARY_EQUIPMENTS.accommodation
+    ),
     verified: room.verifiedAt !== null,
     videoUrl: room.videoUrl,
     openingHours: room.openingHours,
@@ -236,12 +252,9 @@ export async function getRoomDetail(id: string): Promise<RoomDetail | null> {
     depositAmount: decimal(room.depositAmount),
     cleaningFee: decimal(room.cleaningFee),
     petsAllowed: room.petsAllowed,
-    wheelchairAccess: room.wheelchairAccess,
+    wheelchairAccess: hasEquipment(equipments, SUMMARY_EQUIPMENTS.wheelchair),
     photos: room.photos.map((photo) => photo.url),
-    equipments: room.equipments.map((link) => ({
-      name: link.equipment.name,
-      detail: link.detail,
-    })),
+    equipments,
     services: room.services.map((link) => ({
       id: link.service.id,
       name: link.service.name,

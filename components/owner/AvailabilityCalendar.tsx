@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   CalendarRange,
@@ -97,7 +96,14 @@ function plural(count: number, word: string): string {
 interface AvailabilityCalendarProps {
   roomId: string;
   roomName: string;
-  month: OwnerCalendarMonth;
+  /**
+   * Les douze mois gérables, chargés d'un coup par la page : c'est ce qui rend
+   * le changement de mois instantané, sans nouvelle requête ni nouveau rendu
+   * serveur.
+   */
+  months: OwnerCalendarMonth[];
+  /** Mois affiché à l'ouverture, tel que l'URL le demande. */
+  initialMonthKey: string;
   /**
    * Aujourd'hui et dernière date gérable, calculés par la page.
    *
@@ -107,9 +113,6 @@ interface AvailabilityCalendarProps {
    */
   today: string;
   maxDate: string;
-  /** `null` sur la première / dernière borne de la fenêtre gérable. */
-  previousHref: string | null;
-  nextHref: string | null;
 }
 
 /**
@@ -124,21 +127,55 @@ interface AvailabilityCalendarProps {
  * dates passées et les dates verrouillées par une réservation sont ignorées,
  * et le résumé des dates réellement modifiées revient de l'action.
  *
- * La navigation entre les mois passe par des liens : le mois vit dans l'URL,
- * la page est donc partageable et rechargeable, et chaque mois est chargé à la
- * demande plutôt que préchargé sur douze mois.
+ * Le mois affiché est un **état local**. Les douze mois gérables arrivent en un
+ * seul chargement, et les flèches passent de l'un à l'autre sans requête ni
+ * nouveau rendu serveur — auparavant chaque flèche était un lien, donc une
+ * navigation : la page entière se rejouait, et le calendrier se remontait sous
+ * les doigts du propriétaire.
+ *
+ * L'URL suit tout de même, par `history.replaceState` : la vue reste
+ * partageable et rechargeable, sans que ce recalage ne déclenche de navigation.
  */
 export function AvailabilityCalendar({
   roomId,
   roomName,
-  month,
+  months,
+  initialMonthKey,
   today,
   maxDate,
-  previousHref,
-  nextHref,
 }: AvailabilityCalendarProps) {
   const router = useRouter();
-  const [days, setDays] = React.useState(month.days);
+
+  /*
+   * Le mois est choisi ici, pas dans l'URL : `months` contient déjà tout, et un
+   * index évite de rechercher la clé à chaque rendu.
+   */
+  const initialIndex = Math.max(
+    0,
+    months.findIndex((entry) => entry.key === initialMonthKey)
+  );
+  const [monthIndex, setMonthIndex] = React.useState(initialIndex);
+  const month = months[Math.min(monthIndex, months.length - 1)];
+
+  /*
+   * Grilles affichées, par mois. Une modification n'est appliquée qu'au mois
+   * concerné — mais une période peut déborder sur les suivants, d'où le
+   * dictionnaire plutôt qu'un seul tableau.
+   */
+  const [daysByMonth, setDaysByMonth] = React.useState(() =>
+    Object.fromEntries(months.map((entry) => [entry.key, entry.days]))
+  );
+  const days = daysByMonth[month.key] ?? month.days;
+
+  const setDays = React.useCallback(
+    (key: string, update: (previous: OwnerCalendarDay[]) => OwnerCalendarDay[]) => {
+      setDaysByMonth((previous) => ({
+        ...previous,
+        [key]: update(previous[key] ?? []),
+      }));
+    },
+    []
+  );
   const [pendingDates, setPendingDates] = React.useState<ReadonlySet<string>>(
     new Set()
   );
@@ -154,11 +191,35 @@ export function AvailabilityCalendar({
     Ajustement pendant le rendu (et non dans un effet) : React relance le
     rendu immédiatement, sans affichage intermédiaire périmé.
   */
-  const [serverDays, setServerDays] = React.useState(month.days);
-  if (serverDays !== month.days) {
-    setServerDays(month.days);
-    setDays(month.days);
+  const [serverMonths, setServerMonths] = React.useState(months);
+  if (serverMonths !== months) {
+    setServerMonths(months);
+    setDaysByMonth(
+      Object.fromEntries(months.map((entry) => [entry.key, entry.days]))
+    );
   }
+
+  /**
+   * Change de mois sans quitter la page.
+   *
+   * L'URL est recalée par `history.replaceState` — supporté par le routeur de
+   * Next pour exactement ce cas : mettre l'adresse à jour sans déclencher de
+   * navigation, donc sans rejouer le rendu serveur. Un rechargement ou un
+   * partage du lien retombe sur le bon mois.
+   */
+  const goToMonth = React.useCallback(
+    (index: number) => {
+      if (index < 0 || index >= months.length || index === monthIndex) return;
+
+      setMonthIndex(index);
+      window.history.replaceState(
+        null,
+        "",
+        buildAvailabilityHref(roomId, months[index].key)
+      );
+    },
+    [monthIndex, months, roomId]
+  );
 
   const minDate = today;
   const currentMonthKey = today.slice(0, 7);
@@ -198,6 +259,7 @@ export function AvailabilityCalendar({
 
   const [rangeStart, setRangeStart] = React.useState(monthBounds.start);
   const [rangeEnd, setRangeEnd] = React.useState(monthBounds.end);
+
   /** Action de période en cours, pour n'animer que le bouton concerné. */
   const [rangeBusy, setRangeBusy] = React.useState<"open" | "close" | null>(
     null
@@ -206,6 +268,22 @@ export function AvailabilityCalendar({
     tone: "success" | "error" | "info";
     message: string;
   } | null>(null);
+
+  /*
+    La période proposée suit le mois affiché. Le composant ne se remonte plus
+    en changeant de mois : sans ce recalage, « Du / Au » resterait sur les
+    bornes du mois quitté, et le résumé d'une action précédente traînerait sous
+    les yeux. Ajustement pendant le rendu, comme la resynchronisation des
+    grilles — React relance le rendu immédiatement, sans affichage
+    intermédiaire périmé.
+  */
+  const [rangeMonthKey, setRangeMonthKey] = React.useState(month.key);
+  if (rangeMonthKey !== month.key) {
+    setRangeMonthKey(month.key);
+    setRangeStart(monthBounds.start);
+    setRangeEnd(monthBounds.end);
+    setRangeFeedback(null);
+  }
 
   const rangeStats = React.useMemo(() => {
     const total = daysInPeriod(rangeStart, rangeEnd);
@@ -251,7 +329,7 @@ export function AvailabilityCalendar({
       return;
     }
 
-    setDays((previous) =>
+    setDays(result.date.slice(0, 7), (previous) =>
       previous.map((item) =>
         item.date === result.date ? { ...item, status: result.status } : item
       )
@@ -325,16 +403,28 @@ export function AvailabilityCalendar({
     router.refresh();
   }
 
-  /** Repousse dans la grille affichée les dates de la période déjà visibles. */
+  /**
+   * Repousse le résultat d'une période dans les grilles chargées.
+   *
+   * La période n'est pas bornée au mois affiché : elle est reportée sur tous
+   * les mois de la fenêtre, pour que le propriétaire retrouve ses dates déjà à
+   * jour en changeant de mois, sans attendre le rechargement.
+   */
   function reflectRangeResult(result: SetRangeActionResult & { ok: true }) {
     const appliedByDate = new Map(
       result.dates.map((item) => [item.date, item.status])
     );
-    setDays((previous) =>
-      previous.map((item) => {
-        const status = appliedByDate.get(item.date);
-        return status ? { ...item, status } : item;
-      })
+
+    setDaysByMonth((previous) =>
+      Object.fromEntries(
+        Object.entries(previous).map(([key, monthDays]) => [
+          key,
+          monthDays.map((item) => {
+            const status = appliedByDate.get(item.date);
+            return status ? { ...item, status } : item;
+          }),
+        ])
+      )
     );
   }
 
@@ -360,22 +450,34 @@ export function AvailabilityCalendar({
           aria-label="Navigation par mois"
           className="flex items-center justify-between gap-1.5 sm:justify-end"
         >
-          <MonthNavButton direction="prev" href={previousHref} />
+          <MonthNavButton
+            direction="prev"
+            onClick={() => goToMonth(monthIndex - 1)}
+            disabled={monthIndex === 0}
+          />
           <p
             aria-live="polite"
             className="min-w-[8rem] text-center text-sm font-semibold capitalize text-gray-900"
           >
             {monthLabel}
           </p>
-          <MonthNavButton direction="next" href={nextHref} />
+          <MonthNavButton
+            direction="next"
+            onClick={() => goToMonth(monthIndex + 1)}
+            disabled={monthIndex >= months.length - 1}
+          />
           {!isCurrentMonth && (
-            <Link
-              href={buildAvailabilityHref(roomId, currentMonthKey)}
-              scroll={false}
+            <button
+              type="button"
+              onClick={() =>
+                goToMonth(
+                  months.findIndex((entry) => entry.key === currentMonthKey)
+                )
+              }
               className="ml-1 hidden h-8 items-center rounded-md px-2 text-xs font-semibold text-accent transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 sm:inline-flex"
             >
               Aujourd&apos;hui
-            </Link>
+            </button>
           )}
         </nav>
       </header>
@@ -819,40 +921,39 @@ function DayCell({
   );
 }
 
-/** Navigation d'un mois. Rendue inerte aux bornes de la fenêtre gérable. */
+/**
+ * Navigation d'un mois, désactivée aux bornes de la fenêtre gérable.
+ *
+ * Un bouton et non un lien : le mois ne change plus de page, il change d'état.
+ * `disabled` le retire de l'ordre de tabulation aux bornes de la fenêtre, ce
+ * qui est le comportement voulu — il n'y a rien à atteindre au-delà.
+ */
 function MonthNavButton({
   direction,
-  href,
+  onClick,
+  disabled,
 }: {
   direction: "prev" | "next";
-  href: string | null;
+  onClick: () => void;
+  disabled: boolean;
 }) {
   const isPrev = direction === "prev";
   const Icon = isPrev ? ChevronLeft : ChevronRight;
-  const label = isPrev ? "Mois précédent" : "Mois suivant";
-  // Même bouton que partout ailleurs sur le site, ramené au carré d'une icône.
-  const className = cn(
-    buttonVariants({ variant: "outline", size: "sm" }),
-    "h-8 w-8 shrink-0 px-0 text-gray-600"
-  );
-
-  if (!href) {
-    return (
-      <span
-        aria-hidden
-        className={cn(
-          className,
-          "cursor-not-allowed text-gray-300 hover:bg-transparent"
-        )}
-      >
-        <Icon className="h-4 w-4" />
-      </span>
-    );
-  }
 
   return (
-    <Link href={href} scroll={false} aria-label={label} className={className}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={isPrev ? "Mois précédent" : "Mois suivant"}
+      // Même bouton que partout ailleurs sur le site, ramené au carré d'une icône.
+      className={cn(
+        buttonVariants({ variant: "outline", size: "sm" }),
+        "h-8 w-8 shrink-0 px-0 text-gray-600",
+        disabled && "cursor-not-allowed text-gray-300 hover:bg-transparent"
+      )}
+    >
       <Icon aria-hidden className="h-4 w-4" />
-    </Link>
+    </button>
   );
 }

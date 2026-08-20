@@ -9,6 +9,7 @@ import {
   CUSTOM_CATEGORY_ICON_SLUG,
   findCategory,
 } from "@/lib/rooms/categories";
+import { hasEquipment, SUMMARY_EQUIPMENTS } from "@/lib/rooms/equipments";
 import {
   CUSTOM_SERVICE_PRICE,
   findService,
@@ -151,6 +152,46 @@ function rateRows(rates: RoomInput["rates"]) {
   }));
 }
 
+/**
+ * Colonnes de `Room` communes à la création et à la modification.
+ *
+ * Les trois booléens de synthèse ne sont pas saisis : ils se **déduisent** de
+ * la liste des équipements (voir `SUMMARY_EQUIPMENTS`). Les redemander dans un
+ * champ séparé laissait la fiche se contredire — « Parking privé » dans les
+ * équipements et « Parking : non » dans la ligne de repères juste au-dessus.
+ */
+function roomColumns(data: RoomInput) {
+  return {
+    name: data.name,
+    description: data.description,
+    city: data.city,
+    district: data.district,
+    address: data.address,
+    capacityMin: data.capacityMin,
+    capacityMax: data.capacityMax,
+    surfaceM2: data.surfaceM2,
+    spacesCount: data.spacesCount,
+    basePrice: data.basePrice,
+    videoUrl: data.videoUrl,
+    openingHours: data.openingHours,
+    musicPolicy: data.musicPolicy,
+    cancellationPolicy: data.cancellationPolicy,
+    cancellationTerms: data.cancellationTerms,
+    depositAmount: data.depositAmount,
+    cleaningFee: data.cleaningFee,
+    petsAllowed: data.petsAllowed,
+    hasParking: hasEquipment(data.equipments, SUMMARY_EQUIPMENTS.parking),
+    hasAccommodation: hasEquipment(
+      data.equipments,
+      SUMMARY_EQUIPMENTS.accommodation
+    ),
+    wheelchairAccess: hasEquipment(
+      data.equipments,
+      SUMMARY_EQUIPMENTS.wheelchair
+    ),
+  };
+}
+
 export type RoomActionResult =
   | { ok: true; roomId: string; message: string }
   | {
@@ -269,13 +310,7 @@ async function create(formData: FormData): Promise<RoomActionResult> {
 
       return tx.room.create({
         data: {
-          name: data.name,
-          description: data.description,
-          city: data.city,
-          address: data.address,
-          capacityMin: data.capacityMin,
-          capacityMax: data.capacityMax,
-          basePrice: data.basePrice,
+          ...roomColumns(data),
           status: "PENDING",
           owner: { connect: { id: owner.ownerId } },
           // La première catégorie retenue devient la principale ; toutes sont
@@ -406,13 +441,7 @@ async function update(formData: FormData): Promise<RoomActionResult> {
       await tx.room.update({
         where: { id: roomId },
         data: {
-          name: data.name,
-          description: data.description,
-          city: data.city,
-          address: data.address,
-          capacityMin: data.capacityMin,
-          capacityMax: data.capacityMax,
-          basePrice: data.basePrice,
+          ...roomColumns(data),
           category: { connect: { id: categoryIds[0] } },
           categories: {
             create: categoryIds.map((categoryId) => ({ categoryId })),

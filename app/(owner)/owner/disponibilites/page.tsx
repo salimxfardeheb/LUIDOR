@@ -6,9 +6,10 @@ import { FilterSelect } from "@/components/ui/FilterSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { auth } from "@/lib/auth";
-import { getOwnerRoomMonth, todayIso } from "@/lib/owner/availability";
+import { getOwnerRoomWindow, todayIso } from "@/lib/owner/availability";
 import {
   buildAvailabilityHref,
+  editableMonths,
   lastEditableDate,
   resolveMonthWindow,
 } from "@/lib/owner/availability-params";
@@ -55,12 +56,14 @@ export default async function Page({ searchParams }: PageProps) {
   // affiche toujours une salle du propriétaire, jamais une page vide.
   const selectedRoom =
     rooms.find((room) => room.id === searchParams.salle) ?? rooms[0];
-  const monthWindow = resolveMonthWindow(searchParams.mois);
-
-  const month = await getOwnerRoomMonth(
+  // Le mois de l'URL ne sert plus qu'à choisir celui affiché en premier : les
+  // douze mois gérables sont chargés d'un coup, et les flèches passent de l'un
+  // à l'autre dans le navigateur, sans repasser par le serveur.
+  const initialMonthKey = resolveMonthWindow(searchParams.mois).current.key;
+  const months = await getOwnerRoomWindow(
     session.user.id,
     selectedRoom.id,
-    monthWindow.current
+    editableMonths()
   );
 
   return (
@@ -75,34 +78,26 @@ export default async function Page({ searchParams }: PageProps) {
         options={rooms.map((room) => ({
           value: room.id,
           label: `${room.name} — ${room.city}`,
-          href: buildAvailabilityHref(room.id, monthWindow.current.key),
+          href: buildAvailabilityHref(room.id, initialMonthKey),
         }))}
         className="sm:max-w-sm"
       />
 
-      {month ? (
+      {months && months.length > 0 ? (
         <AvailabilityCalendar
-          // Remonter le composant à chaque changement de salle ou de mois : son
-          // état local repart alors de la grille rendue par le serveur.
-          key={`${selectedRoom.id}-${month.key}`}
+          // Remonter le composant à chaque changement de salle : son état local
+          // repart alors des grilles rendues par le serveur. Le mois, lui, est
+          // désormais un état interne — en changer ne remonte rien.
+          key={selectedRoom.id}
           roomId={selectedRoom.id}
           roomName={selectedRoom.name}
-          month={month}
+          months={months}
+          initialMonthKey={initialMonthKey}
           // Bornes de la fenêtre gérable calculées ici : le calendrier tourne
           // dans le navigateur, mais ce n'est pas à l'horloge du visiteur de
           // décider quelles dates sont modifiables.
           today={todayIso()}
           maxDate={lastEditableDate()}
-          previousHref={
-            monthWindow.previous
-              ? buildAvailabilityHref(selectedRoom.id, monthWindow.previous.key)
-              : null
-          }
-          nextHref={
-            monthWindow.next
-              ? buildAvailabilityHref(selectedRoom.id, monthWindow.next.key)
-              : null
-          }
         />
       ) : (
         <Alert variant="error" title="Salle indisponible">

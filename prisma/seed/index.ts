@@ -1,4 +1,8 @@
 import { PrismaClient, type Prisma, type RateUnit } from "@prisma/client";
+import {
+  hasEquipment,
+  SUMMARY_EQUIPMENTS,
+} from "../../lib/rooms/equipments";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -64,6 +68,7 @@ const EQUIPMENTS = [
   "Vidéoprojecteur",
   "Terrasse",
   "Accès PMR",
+  "Hébergement sur place",
 ];
 
 /** Services optionnels proposés par les propriétaires, avec leur tarif. */
@@ -127,7 +132,6 @@ const DEFAULT_PRACTICAL = {
   depositAmount: 50000,
   cleaningFee: 15000,
   petsAllowed: false,
-  wheelchairAccess: true,
 };
 
 type Practical = typeof DEFAULT_PRACTICAL;
@@ -150,8 +154,6 @@ interface RoomSeed {
   basePrice: number;
   surfaceM2: number;
   spacesCount: number;
-  hasParking: boolean;
-  hasAccommodation: boolean;
   /** Salle contrôlée par l'équipe : affiche le badge « Vérifiée ». */
   verified: boolean;
   videoUrl?: string;
@@ -196,8 +198,6 @@ const ROOMS: RoomSeed[] = [
     basePrice: 320000,
     surfaceM2: 950,
     spacesCount: 4,
-    hasParking: true,
-    hasAccommodation: true,
     verified: true,
     videoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
     ratings: [5, 5, 5, 4],
@@ -208,6 +208,7 @@ const ROOMS: RoomSeed[] = [
       "Éclairage scénique",
       "Cuisine équipée",
       "Accès PMR",
+      "Hébergement sur place",
     ],
     services: [
       "Traiteur",
@@ -249,8 +250,6 @@ const ROOMS: RoomSeed[] = [
     basePrice: 240000,
     surfaceM2: 620,
     spacesCount: 3,
-    hasParking: true,
-    hasAccommodation: false,
     verified: true,
     ratings: [5, 4, 5],
     equipments: [
@@ -285,16 +284,16 @@ const ROOMS: RoomSeed[] = [
     basePrice: 280000,
     surfaceM2: 780,
     spacesCount: 3,
-    hasParking: true,
-    hasAccommodation: true,
     verified: true,
     ratings: [5, 4, 4, 5],
     equipments: [
+      "Parking privé",
       "Climatisation",
       "Sonorisation",
       "Éclairage scénique",
       "Terrasse",
       "Wifi",
+      "Hébergement sur place",
     ],
     services: ["Traiteur", "DJ & animation", "Photographe", "Navette invités"],
   },
@@ -309,8 +308,6 @@ const ROOMS: RoomSeed[] = [
     basePrice: 165000,
     surfaceM2: 380,
     spacesCount: 2,
-    hasParking: true,
-    hasAccommodation: false,
     verified: true,
     ratings: [4, 4, 5],
     equipments: ["Climatisation", "Sonorisation", "Parking privé", "Wifi"],
@@ -327,8 +324,6 @@ const ROOMS: RoomSeed[] = [
     basePrice: 130000,
     surfaceM2: 300,
     spacesCount: 2,
-    hasParking: false,
-    hasAccommodation: false,
     verified: false,
     ratings: [4, 5],
     equipments: ["Climatisation", "Sonorisation", "Terrasse", "Espace enfants"],
@@ -337,7 +332,6 @@ const ROOMS: RoomSeed[] = [
       openingHours: "10:00 – 00:00",
       musicPolicy: "Sonorisation autorisée jusqu'à minuit",
       cancellationPolicy: "Modérée",
-      wheelchairAccess: false,
     },
   },
   {
@@ -350,8 +344,6 @@ const ROOMS: RoomSeed[] = [
     basePrice: 410000,
     surfaceM2: 1400,
     spacesCount: 6,
-    hasParking: true,
-    hasAccommodation: true,
     verified: true,
     videoUrl: "https://www.youtube.com/watch?v=aqz-KE-bpKQ",
     ratings: [5, 4],
@@ -362,6 +354,7 @@ const ROOMS: RoomSeed[] = [
       "Sonorisation",
       "Parking privé",
       "Accès PMR",
+      "Hébergement sur place",
     ],
     services: ["Traiteur", "Service de sécurité", "Navette invités"],
     rates: [
@@ -399,11 +392,16 @@ const ROOMS: RoomSeed[] = [
     basePrice: 95000,
     surfaceM2: 240,
     spacesCount: 3,
-    hasParking: true,
-    hasAccommodation: true,
     verified: false,
     ratings: [4, 4],
-    equipments: ["Terrasse", "Espace enfants", "Sonorisation", "Wifi"],
+    equipments: [
+      "Parking privé",
+      "Terrasse",
+      "Espace enfants",
+      "Sonorisation",
+      "Wifi",
+      "Hébergement sur place",
+    ],
     services: ["Pâtisserie & gâteau", "Photographe"],
     practical: { petsAllowed: true, depositAmount: 30000, cleaningFee: 8000 },
   },
@@ -418,8 +416,6 @@ const ROOMS: RoomSeed[] = [
     basePrice: 110000,
     surfaceM2: 260,
     spacesCount: 2,
-    hasParking: true,
-    hasAccommodation: false,
     verified: true,
     ratings: [4],
     equipments: ["Climatisation", "Cuisine équipée", "Parking privé"],
@@ -436,8 +432,6 @@ const ROOMS: RoomSeed[] = [
     basePrice: 260000,
     surfaceM2: 520,
     spacesCount: 5,
-    hasParking: true,
-    hasAccommodation: false,
     verified: true,
     ratings: [3, 4],
     equipments: [
@@ -464,13 +458,11 @@ const ROOMS: RoomSeed[] = [
     basePrice: 85000,
     surfaceM2: 180,
     spacesCount: 2,
-    hasParking: false,
-    hasAccommodation: false,
     verified: false,
     ratings: [],
     equipments: ["Wifi", "Vidéoprojecteur", "Climatisation"],
     services: ["Traiteur"],
-    practical: { openingHours: "08:00 – 20:00", wheelchairAccess: false },
+    practical: { openingHours: "08:00 – 20:00" },
   },
 ];
 
@@ -580,6 +572,7 @@ async function main() {
     if (!categoryId) throw new Error(`Catégorie inconnue : ${room.category}`);
 
     const practical: Practical = { ...DEFAULT_PRACTICAL, ...room.practical };
+    const equipmentList = room.equipments.map((name) => ({ name }));
     const coords = CITY_COORDS[room.city] ?? null;
 
     const data: Prisma.RoomCreateInput = {
@@ -595,8 +588,14 @@ async function main() {
       basePrice: room.basePrice,
       surfaceM2: room.surfaceM2,
       spacesCount: room.spacesCount,
-      hasParking: room.hasParking,
-      hasAccommodation: room.hasAccommodation,
+      // Déduits des équipements, comme le fait l'action du formulaire salle :
+      // la fiche ne peut donc pas annoncer « Parking : non » au-dessus d'une
+      // liste où figure « Parking privé ».
+      hasParking: hasEquipment(equipmentList, SUMMARY_EQUIPMENTS.parking),
+      hasAccommodation: hasEquipment(
+        equipmentList,
+        SUMMARY_EQUIPMENTS.accommodation
+      ),
       verifiedAt: room.verified ? new Date() : null,
       videoUrl: room.videoUrl ?? null,
       openingHours: practical.openingHours,
@@ -606,7 +605,10 @@ async function main() {
       depositAmount: practical.depositAmount,
       cleaningFee: practical.cleaningFee,
       petsAllowed: practical.petsAllowed,
-      wheelchairAccess: practical.wheelchairAccess,
+      wheelchairAccess: hasEquipment(
+        equipmentList,
+        SUMMARY_EQUIPMENTS.wheelchair
+      ),
       status: "ACTIVE",
       owner: { connect: { id: owners[index % owners.length].id } },
       category: { connect: { id: categoryId } },

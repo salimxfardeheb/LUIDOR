@@ -115,6 +115,8 @@ export interface BookingRequestMail {
   /** Date de l'événement, déjà formatée pour lecture humaine. */
   eventDate: string;
   guestsCount: number;
+  /** Prestations cochées par le client, vide s'il n'en a demandé aucune. */
+  services: string[];
 }
 
 /**
@@ -139,6 +141,9 @@ export async function sendBookingRequestEmails(
     `Type d'événement : ${request.eventType}`,
     `Date : ${request.eventDate}`,
     `Invités : ${request.guestsCount}`,
+    ...(request.services.length > 0
+      ? [`Services souhaités : ${request.services.join(", ")}`]
+      : []),
   ];
 
   const results = await Promise.allSettled([

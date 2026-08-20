@@ -3,6 +3,7 @@
 import * as React from "react";
 import { PhoneCall, Send } from "lucide-react";
 import { submitBookingRequest } from "@/actions/bookings";
+import { servicePriceLabel } from "@/components/rooms/detail/ChipGrid";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { FormField, fieldAria } from "@/components/ui/FormField";
@@ -11,6 +12,7 @@ import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
 import { BOOKING_REQUEST_LIMITS } from "@/lib/bookings/schemas";
 import type { FieldErrors } from "@/lib/forms";
+import type { RoomDetail } from "@/lib/rooms/detail";
 
 export interface BookingRequestDefaults {
   eventType: string;
@@ -36,6 +38,7 @@ export function BookingRequestModal({
   roomName,
   capacityMin,
   capacityMax,
+  services,
   eventTypes,
   defaults,
 }: {
@@ -48,6 +51,8 @@ export function BookingRequestModal({
   /** `null` quand la salle n'annonce pas de minimum. */
   capacityMin: number | null;
   capacityMax: number;
+  /** Prestations de la salle : le client coche celles qui l'intéressent. */
+  services: RoomDetail["services"];
   eventTypes: string[];
   defaults: BookingRequestDefaults;
 }) {
@@ -177,12 +182,19 @@ export function BookingRequestModal({
             </Select>
           </FormField>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          {/*
+            Lignes partagées (`subgrid`) : les deux champs alignent leur libellé,
+            leur aide et leur champ. Sans cela, l'aide du nombre d'invités
+            décalait sa saisie d'une ligne sous celle de la date.
+          */}
+          <div className="grid gap-4 sm:grid-cols-2 sm:grid-rows-[auto_auto_auto] sm:gap-y-1.5">
             <FormField
               id="resa-eventDate"
               label="Date de l'événement"
+              hint="Une seule journée par demande."
               required
               error={fieldErrors.eventDate}
+              className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
             >
               <Input
                 id="resa-eventDate"
@@ -192,6 +204,7 @@ export function BookingRequestModal({
                 onChange={clearFieldError}
                 required
                 {...fieldAria("resa-eventDate", {
+                  hint: true,
                   error: fieldErrors.eventDate,
                 })}
               />
@@ -207,6 +220,7 @@ export function BookingRequestModal({
               }
               required
               error={fieldErrors.guestsCount}
+              className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
             >
               <Input
                 id="resa-guestsCount"
@@ -226,6 +240,54 @@ export function BookingRequestModal({
               />
             </FormField>
           </div>
+
+          {/*
+            Prestations souhaitées : une demande n'est pas un devis, le client
+            dit ce qui l'intéresse et l'équipe chiffre au téléphone. D'où des
+            cases à cocher facultatives et un rappel que rien n'est figé.
+
+            `fieldset` et `legend` plutôt qu'un simple titre : le lecteur
+            d'écran annonce alors le groupe avant chaque case, sans quoi
+            « Traiteur » arriverait sans contexte.
+          */}
+          {services.length > 0 && (
+            <fieldset>
+              <legend className="mb-1.5 flex flex-wrap items-center gap-x-2 text-sm font-medium text-gray-700">
+                Services souhaités
+                <span className="text-xs font-normal text-gray-500">
+                  facultatif
+                </span>
+              </legend>
+
+              <ul className="grid gap-2 sm:grid-cols-2">
+                {services.map((service) => (
+                  <li key={service.id}>
+                    <label className="flex h-full cursor-pointer items-start gap-2.5 rounded-lg border border-gray-200 bg-white p-2.5 transition-colors hover:border-secondary/60 has-[:checked]:border-secondary has-[:checked]:bg-secondary/5">
+                      <input
+                        type="checkbox"
+                        name="serviceIds"
+                        value={service.id}
+                        className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border-gray-300 accent-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-gray-900">
+                          {service.name}
+                        </span>
+                        <span className="block text-xs text-gray-500">
+                          {servicePriceLabel(service.price)}
+                        </span>
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="mt-2 text-xs text-gray-500">
+                Ces prestations ne sont pas facturées à l&apos;envoi : nous les
+                chiffrons avec vous lors de notre appel.
+              </p>
+            </fieldset>
+          )}
 
           <FormField
             id="resa-contactPhone"

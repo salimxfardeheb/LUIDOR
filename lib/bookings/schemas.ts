@@ -14,6 +14,8 @@ export const BOOKING_REQUEST_LIMITS = {
   eventType: { min: 2, max: 60 },
   phone: { min: 6, max: 20 },
   guests: { min: 1, max: 5000 },
+  /** Prestations cochées dans la demande. */
+  services: { max: 20 },
 } as const;
 
 /** `YYYY-MM-DD`, tel que produit par un `<input type="date">`. */
@@ -39,6 +41,18 @@ export const bookingRequestSchema = z.object({
     .string()
     .regex(/^[0-9+\s().-]{6,20}$/, "Numéro de téléphone invalide."),
   contactEmail: z.string().toLowerCase().email("Adresse email invalide."),
+  /**
+   * Prestations cochées par le client. Facultatif : une demande sans service
+   * reste une demande. Les identifiants sont recoupés avec ceux de la salle par
+   * l'action serveur — un formulaire est un point d'entrée HTTP, rien
+   * n'empêche d'y glisser l'identifiant d'un service qu'elle ne propose pas.
+   */
+  serviceIds: z
+    .array(z.string().min(1))
+    .max(
+      BOOKING_REQUEST_LIMITS.services.max,
+      `${BOOKING_REQUEST_LIMITS.services.max} services au maximum.`
+    ),
 });
 
 export type BookingRequestInput = z.infer<typeof bookingRequestSchema>;
@@ -56,6 +70,10 @@ export function parseBookingRequestForm(
     guestsCount: guests === "" ? Number.NaN : Number(guests),
     contactPhone: text(formData.get("contactPhone")),
     contactEmail: text(formData.get("contactEmail")),
+    serviceIds: formData
+      .getAll("serviceIds")
+      .map((value) => text(value))
+      .filter((value) => value !== ""),
   });
 
   if (parsed.success) return { ok: true, data: parsed.data };

@@ -2,22 +2,26 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
-import { setBookingDecision } from "@/actions/admin-bookings";
+import { Check, PlayCircle, X } from "lucide-react";
+import {
+  setBookingDecision,
+  startBookingVerification,
+} from "@/actions/admin-bookings";
 import { Alert } from "@/components/ui/Alert";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
 /**
- * Décision de l'équipe sur une réservation : confirmer ou annuler.
+ * Ce que l'équipe peut faire avancer sur une réservation.
  *
- * Proposée uniquement sur une demande en cours de vérification — c'est le seul
- * moment où la décision appartient à l'administration. Une demande encore en
- * attente appartient au propriétaire, et une réservation déjà confirmée ou
- * clôturée ne se rejoue pas depuis une liste.
+ * Le parcours suit l'argent : une demande est **prise en charge**, puis
+ * l'encaissement du client la **confirme tout seul** (`recordCashPayment`) et
+ * ferme la date. Le bouton « Confirmer » reste là pour les exceptions — une
+ * réservation réglée autrement, une faveur — et « Annuler » pour refermer une
+ * demande sans suite.
  *
- * Confirmer ferme la date au calendrier de la salle : c'est l'action serveur
- * qui s'en charge, dans la même transaction que le changement de statut.
+ * Rien n'est proposé sur une réservation confirmée, annulée ou clôturée : ces
+ * états ne se rejouent pas depuis une liste.
  */
 export function BookingDecisionActions({
   bookingId,
@@ -34,13 +38,16 @@ export function BookingDecisionActions({
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  if (status !== "EN_COURS_VERIFICATION") return null;
+  const waiting = status === "EN_ATTENTE";
+  const verifying = status === "EN_COURS_VERIFICATION";
 
-  async function decide(decision: "CONFIRMEE" | "ANNULEE") {
+  if (!waiting && !verifying) return null;
+
+  async function run(action: () => Promise<{ ok: boolean; message: string }>) {
     setPending(true);
     setError(null);
 
-    const result = await setBookingDecision(bookingId, decision);
+    const result = await action();
     setPending(false);
 
     if (!result.ok) {
@@ -54,23 +61,38 @@ export function BookingDecisionActions({
   return (
     <div className={cn("flex flex-col items-end gap-2", className)}>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={pending}
-          onClick={() => decide("CONFIRMEE")}
-        >
-          <Check aria-hidden className="h-4 w-4" />
-          Confirmer
-          <span className="sr-only"> la réservation de {clientName}</span>
-        </Button>
+        {waiting ? (
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={pending}
+            onClick={() => run(() => startBookingVerification(bookingId))}
+          >
+            <PlayCircle aria-hidden className="h-4 w-4" />
+            Prendre en charge
+            <span className="sr-only"> la demande de {clientName}</span>
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={pending}
+            onClick={() => run(() => setBookingDecision(bookingId, "CONFIRMEE"))}
+          >
+            <Check aria-hidden className="h-4 w-4" />
+            Confirmer
+            <span className="sr-only"> la réservation de {clientName}</span>
+          </Button>
+        )}
+
         <Button
           type="button"
           variant="outline"
           size="sm"
           disabled={pending}
-          onClick={() => decide("ANNULEE")}
+          onClick={() => run(() => setBookingDecision(bookingId, "ANNULEE"))}
         >
           <X aria-hidden className="h-4 w-4" />
           Annuler

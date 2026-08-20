@@ -365,7 +365,9 @@ model Service {
   name  String  @unique
   price Decimal @db.Decimal(10, 2)
 
-  rooms RoomService[]
+  rooms    RoomService[]
+  /// Demandes de réservation où le client a coché cette prestation.
+  bookings BookingService[]
 
   @@map("services")
 }
@@ -449,9 +451,11 @@ model Booking {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  client  User     @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
-  room    Room     @relation(fields: [roomId], references: [id], onDelete: Restrict)
-  payment Payment?
+  client   User             @relation("BookingClient", fields: [clientId], references: [id], onDelete: Cascade)
+  room     Room             @relation(fields: [roomId], references: [id], onDelete: Restrict)
+  payment  Payment?
+  /// Prestations que le client a cochées en déposant sa demande.
+  services BookingService[]
 
   @@index([clientId])
   @@index([roomId])
@@ -471,6 +475,24 @@ model Booking {
 /// champs `payout*` la seconde (LIUDOR → propriétaire). Un reversement sans
 /// encaissement est refusé par l'action serveur : la plateforme ne reverse pas
 /// ce qu'elle n'a pas reçu.
+/// Prestation demandée par le client au moment de sa demande de réservation.
+///
+/// Une demande n'est pas un devis : le client dit ce qui l'intéresse — traiteur,
+/// photographe — et l'équipe LIUDOR chiffre au téléphone. D'où un simple
+/// rattachement, sans montant figé : le tarif qui fait foi reste celui de la
+/// salle (`RoomService.price`), qui peut évoluer entre la demande et l'appel.
+model BookingService {
+  bookingId String
+  serviceId String
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([bookingId, serviceId])
+  @@index([serviceId])
+  @@map("booking_services")
+}
+
 model Payment {
   id         String        @id @default(cuid())
   bookingId  String        @unique

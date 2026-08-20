@@ -108,13 +108,24 @@ export interface RoomFormValues {
   name: string;
   description: string;
   city: string;
+  district: string | null;
   address: string;
   /** Libellés des catégories retenues ; le premier est la catégorie principale. */
   categoryNames: string[];
   /** `null` quand la salle n'annonce pas de minimum. */
   capacityMin: number | null;
   capacityMax: number;
+  surfaceM2: number | null;
+  spacesCount: number | null;
   basePrice: number;
+  videoUrl: string | null;
+  openingHours: string | null;
+  musicPolicy: string | null;
+  cancellationPolicy: string | null;
+  cancellationTerms: string | null;
+  depositAmount: number | null;
+  cleaningFee: number | null;
+  petsAllowed: boolean;
   status: RoomStatus;
   /** Équipements retenus, avec la précision saisie pour cette salle. */
   equipments: { name: string; detail: string | null }[];
@@ -151,12 +162,23 @@ export async function getOwnerRoomForEdit(
       name: true,
       description: true,
       city: true,
+      district: true,
       address: true,
       category: { select: { name: true } },
       categories: { select: { category: { select: { name: true } } } },
       capacityMin: true,
       capacityMax: true,
+      surfaceM2: true,
+      spacesCount: true,
       basePrice: true,
+      videoUrl: true,
+      openingHours: true,
+      musicPolicy: true,
+      cancellationPolicy: true,
+      cancellationTerms: true,
+      depositAmount: true,
+      cleaningFee: true,
+      petsAllowed: true,
       status: true,
       equipments: {
         select: { detail: true, equipment: { select: { name: true } } },
@@ -187,6 +209,7 @@ export async function getOwnerRoomForEdit(
       name: room.name,
       description: room.description,
       city: room.city,
+      district: room.district,
       address: room.address,
       // La principale d'abord : l'ordre du formulaire détermine laquelle le
       // restera à l'enregistrement.
@@ -198,7 +221,19 @@ export async function getOwnerRoomForEdit(
       ],
       capacityMin: room.capacityMin,
       capacityMax: room.capacityMax,
+      surfaceM2: room.surfaceM2,
+      spacesCount: room.spacesCount,
       basePrice: Number(room.basePrice),
+      videoUrl: room.videoUrl,
+      openingHours: room.openingHours,
+      musicPolicy: room.musicPolicy,
+      cancellationPolicy: room.cancellationPolicy,
+      cancellationTerms: room.cancellationTerms,
+      // `Decimal` ne traverse pas la frontière serveur → client.
+      depositAmount:
+        room.depositAmount === null ? null : Number(room.depositAmount),
+      cleaningFee: room.cleaningFee === null ? null : Number(room.cleaningFee),
+      petsAllowed: room.petsAllowed,
       status: room.status,
       equipments: room.equipments.map((link) => ({
         name: link.equipment.name,

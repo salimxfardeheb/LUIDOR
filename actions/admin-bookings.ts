@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import type { BookingStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireAdminSession, type AdminRefusal } from "@/lib/admin/guards";
 import { recordAudit } from "@/lib/admin/audit";
@@ -58,6 +59,36 @@ function revalidateRoomAvailability(roomId: string) {
 const idSchema = z.string().min(1);
 
 /**
+ * Ferme la date d'une réservation confirmée dans le calendrier de la salle.
+ *
+ * Sans cette écriture, la ligne `Availability` resterait `AVAILABLE` : les
+ * calendriers masquent bien la date parce qu'ils superposent les réservations,
+ * mais tout ce qui lit la disponibilité seule — compteur de dates ouvertes du
+ * propriétaire, recherche par date — continuerait à la compter comme libre.
+ *
+ * `eventDate` vient d'une colonne `@db.Date` : c'est déjà minuit UTC, la clé
+ * composite `roomId_date` s'aligne sans conversion.
+ */
+async function closeRoomDate(
+  tx: Prisma.TransactionClient,
+  roomId: string,
+  eventDate: Date
+): Promise<void> {
+  await tx.availability.upsert({
+    where: { roomId_date: { roomId, date: eventDate } },
+    create: { roomId, date: eventDate, status: "BLOCKED" },
+    update: { status: "BLOCKED" },
+  });
+}
+
+/** Statuts depuis lesquels une réservation peut encore basculer. */
+const OPEN_STATUSES = ["EN_ATTENTE", "EN_COURS_VERIFICATION"] as const;
+
+function isOpen(status: BookingStatus): boolean {
+  return (OPEN_STATUSES as readonly BookingStatus[]).includes(status);
+}
+
+/**
  * Montant encaissé.
  *
  * Positif et plafonné : une saisie à dix millions de dinars est une faute de
@@ -74,18 +105,18 @@ const paymentSchema = z.object({
 });
 
 /**
- * Confirme ou annule une réservation en cours de vérification.
+ * Confirme ou annule une réservation encore ouverte.
  *
- * Seul ce statut est modifiable ici : une demande encore en attente appartient
- * au propriétaire, et une réservation déjà confirmée ou clôturée ne se rejoue
- * pas depuis une liste.
+ * Les deux statuts vivants sont acceptés — `EN_ATTENTE` et
+ * `EN_COURS_VERIFICATION` : une demande fraîche doit pouvoir être annulée sans
+ * passer d'abord par la vérification, et l'équipe peut confirmer une
+ * réservation réglée autrement qu'en espèces. Une réservation déjà confirmée,
+ * annulée ou clôturée ne se rejoue pas depuis une liste.
  *
- * Une confirmation ferme la date : la disponibilité de la salle passe à
- * `BLOCKED` dans la même transaction que le statut. Sans cette écriture, la
- * ligne `Availability` resterait `AVAILABLE` — les calendriers masquent bien la
- * date parce qu'ils superposent les réservations, mais tout ce qui lit la
- * disponibilité seule (compteur de dates ouvertes du propriétaire, recherche
- * par date) continuerait à la compter comme libre.
+ * Le cas courant ne passe pas par ici : encaisser confirme la réservation tout
+ * seul (`recordCashPayment`). Ces boutons servent aux exceptions.
+ *
+ * Une confirmation ferme la date, dans la même transaction que le statut.
  *
  * L'annulation ne rouvre pas la date : le propriétaire l'avait peut-être fermée
  * avant la demande, et la rouvrir d'office déciderait à sa place. Un clic sur
@@ -126,12 +157,12 @@ export async function setBookingDecision(
     return { ok: false, status: 404, message: "Cette réservation n'existe plus." };
   }
 
-  if (booking.status !== "EN_COURS_VERIFICATION") {
+  if (!isOpen(booking.status)) {
     return {
       ok: false,
       status: 409,
       message:
-        "Seule une réservation en cours de vérification peut être confirmée ou annulée ici. Actualisez la page.",
+        "Cette réservation n'est plus ouverte : elle est déjà confirmée, annulée ou clôturée. Actualisez la page.",
     };
   }
 
@@ -148,19 +179,7 @@ export async function setBookingDecision(
 
       if (!confirmed) return;
 
-      // `eventDate` vient d'une colonne `@db.Date` : c'est déjà minuit UTC, la
-      // clé composite `roomId_date` s'aligne sans conversion.
-      await tx.availability.upsert({
-        where: {
-          roomId_date: { roomId: booking.roomId, date: booking.eventDate },
-        },
-        create: {
-          roomId: booking.roomId,
-          date: booking.eventDate,
-          status: "BLOCKED",
-        },
-        update: { status: "BLOCKED" },
-      });
+      await closeRoomDate(tx, booking.roomId, booking.eventDate);
     });
   } catch (error) {
     console.error("setBookingDecision a échoué", error);
@@ -200,11 +219,78 @@ export async function setBookingDecision(
 }
 
 /**
+ * Prend une demande en charge : `EN_ATTENTE` → `EN_COURS_VERIFICATION`.
+ *
+ * C'est l'étape que le statut décrit déjà — « l'équipe LIUDOR vérifie le
+ * paiement » — et sans elle une demande restait bloquée en attente, aucune
+ * action ne la faisant avancer. Elle ne ferme aucune date : tant que rien n'est
+ * encaissé, la réservation n'est pas acquise.
+ *
+ * Pas de journal d'audit ici, contrairement à la confirmation et à
+ * l'encaissement : c'est un geste de tri interne, il n'engage ni l'argent ni la
+ * date.
+ */
+export async function startBookingVerification(
+  bookingId: string
+): Promise<BookingActionResult> {
+  const session = await requireAdminSession();
+  if (!session.ok) return { ok: false, ...session.refusal };
+
+  const parsed = idSchema.safeParse(bookingId);
+  if (!parsed.success) return { ok: false, message: "Réservation inconnue." };
+
+  const booking = await prisma.booking.findUnique({
+    where: { id: parsed.data },
+    select: { status: true },
+  });
+
+  if (!booking) {
+    return { ok: false, status: 404, message: "Cette réservation n'existe plus." };
+  }
+
+  if (booking.status !== "EN_ATTENTE") {
+    return {
+      ok: false,
+      status: 409,
+      message:
+        "Seule une demande en attente peut être prise en charge. Actualisez la page.",
+    };
+  }
+
+  try {
+    await prisma.booking.update({
+      where: { id: parsed.data },
+      data: { status: "EN_COURS_VERIFICATION" },
+    });
+  } catch (error) {
+    console.error("startBookingVerification a échoué", error);
+    return { ok: false, message: "La mise à jour a échoué. Réessayez." };
+  }
+
+  revalidateBookings();
+
+  return {
+    ok: true,
+    message:
+      "Demande prise en charge : elle passe en vérification, en attente de l'encaissement.",
+  };
+}
+
+/**
  * Enregistre un encaissement en espèces sur une réservation.
  *
  * `Payment.bookingId` est unique : un second enregistrement met à jour la ligne
  * existante plutôt que d'échouer sur la contrainte — c'est le cas d'une
  * correction de montant après une saisie erronée.
+ *
+ * **L'encaissement confirme la réservation.** C'est l'argent qui décide, pas un
+ * clic de plus : une fois la somme reçue, la date est acquise au client et elle
+ * se ferme au calendrier, dans la même transaction que le paiement. Sans cela,
+ * une réservation encaissée pouvait rester « en attente » et sa date être
+ * revendue à quelqu'un d'autre.
+ *
+ * Le geste reste sans effet sur le statut d'une réservation déjà confirmée ou
+ * clôturée : corriger un montant ne doit pas rejouer une décision.
  */
 export async function recordCashPayment(input: {
   bookingId: string;
@@ -231,8 +317,19 @@ export async function recordCashPayment(input: {
       where: { id: bookingId },
       select: {
         status: true,
+        roomId: true,
+        eventDate: true,
+        eventType: true,
+        guestsCount: true,
+        contactEmail: true,
         client: { select: { fullName: true } },
-        room: { select: { name: true } },
+        room: {
+          select: {
+            name: true,
+            city: true,
+            owner: { select: { fullName: true, email: true } },
+          },
+        },
       },
     }),
     prisma.user.findFirst({
@@ -264,38 +361,86 @@ export async function recordCashPayment(input: {
     };
   }
 
+  // Une réservation encore ouverte est confirmée par l'encaissement lui-même.
+  const confirms = isOpen(booking.status);
+  const paidAt = new Date();
+
   try {
-    await prisma.payment.upsert({
-      where: { bookingId },
-      create: {
-        bookingId,
-        amount,
-        status: "PAID",
-        paidAt: new Date(),
-        recordedBy: recorder.id,
-      },
-      update: {
-        amount,
-        status: "PAID",
-        paidAt: new Date(),
-        recordedBy: recorder.id,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.upsert({
+        where: { bookingId },
+        create: {
+          bookingId,
+          amount,
+          status: "PAID",
+          paidAt,
+          recordedBy: recorder.id,
+        },
+        update: {
+          amount,
+          status: "PAID",
+          paidAt,
+          recordedBy: recorder.id,
+        },
+      });
+
+      if (!confirms) return;
+
+      await tx.booking.update({
+        where: { id: bookingId },
+        data: { status: "CONFIRMEE" },
+      });
+      await closeRoomDate(tx, booking.roomId, booking.eventDate);
     });
   } catch (error) {
     console.error("recordCashPayment a échoué", error);
     return { ok: false, message: "L'enregistrement du paiement a échoué. Réessayez." };
   }
 
+  const target = `${booking.room.name} — ${booking.client.fullName}`;
+
   await recordAudit({
     userId: session.adminId,
     action: "PAYMENT_RECORDED",
-    target: `${booking.room.name} — ${booking.client.fullName}`,
+    target,
     detail: `${amount.toLocaleString("fr-DZ")} DA en espèces, encaissés par ${recorder.fullName}`,
   });
 
-  revalidateBookings();
+  if (confirms) {
+    // Deux entrées au journal, et c'est voulu : l'argent reçu et la décision
+    // qu'il emporte se relisent séparément lors d'un contrôle de caisse.
+    await recordAudit({
+      userId: session.adminId,
+      action: "BOOKING_CONFIRMED",
+      target,
+      detail: "Confirmée automatiquement par l'encaissement du client",
+    });
 
-  return { ok: true, message: "Paiement en espèces enregistré." };
+    // Best-effort : le client et le propriétaire apprennent la confirmation
+    // exactement comme si elle avait été prise à la main.
+    await sendBookingDecisionEmails({
+      decision: "CONFIRMEE",
+      clientName: booking.client.fullName,
+      clientEmail: booking.contactEmail,
+      roomName: booking.room.name,
+      roomCity: booking.room.city,
+      eventType: booking.eventType,
+      eventDate: formatDate(booking.eventDate),
+      guestsCount: booking.guestsCount,
+      ownerName: booking.room.owner.fullName,
+      ownerEmail: booking.room.owner.email,
+    });
+  }
+
+  revalidateBookings();
+  if (confirms) revalidateRoomAvailability(booking.roomId);
+
+  return {
+    ok: true,
+    message: confirms
+      ? "Paiement enregistré : la réservation est confirmée et la date fermée au calendrier."
+      : "Paiement en espèces enregistré.",
+  };
 }
 
 /**

@@ -346,13 +346,14 @@ export function RoomForm({
               recherche du catalogue filtre sur une égalité de chaîne, et « Alger »,
               « alger » et « Algers » y créaient jusqu'ici trois villes distinctes.
             */}
+            <div className="grid gap-5 sm:grid-cols-2 sm:grid-rows-[auto_auto_auto] sm:gap-y-1.5">
             <FormField
               id="city"
               label="Wilaya"
               required
               error={error("city")}
               hint="Tapez les premières lettres ou le numéro de la wilaya, puis choisissez dans la liste."
-              className="sm:max-w-xs"
+              className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
             >
               <Combobox
                 id="city"
@@ -366,6 +367,29 @@ export function RoomForm({
                 {...fieldAria("city", { hint: true, error: error("city") })}
               />
             </FormField>
+
+            {/* Le quartier complète le fil d'Ariane de la fiche et situe la
+                salle dans sa ville ; il n'entre dans aucun filtre. */}
+            <FormField
+              id="district"
+              label="Quartier"
+              error={error("district")}
+              hint="Facultatif, tel qu'on le nomme sur place."
+              className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
+            >
+              <Input
+                id="district"
+                name="district"
+                defaultValue={room?.district ?? ""}
+                maxLength={ROOM_LIMITS.district.max}
+                placeholder="Dely Ibrahim"
+                {...fieldAria("district", {
+                  hint: true,
+                  error: error("district"),
+                })}
+              />
+            </FormField>
+            </div>
 
             {/*
               Sélection multiple : une salle peut convenir à plusieurs types
@@ -427,9 +451,10 @@ export function RoomForm({
 
         <FormSection
           id="bloc-capacite"
-          title="Capacité"
+          title="Capacité et espaces"
           description="Le nombre d'invités que la salle peut accueillir : c'est ce qui la fait ressortir dans les recherches des clients. Le minimum ne sert qu'aux salles qui refusent les événements trop petits."
         >
+          <div className="flex flex-col gap-5">
           {/*
             Lignes partagées (`subgrid`) : libellés, aides et champs s'alignent
             ligne à ligne quelle que soit la longueur des textes. Sans cela,
@@ -491,6 +516,59 @@ export function RoomForm({
                 })}
               />
             </FormField>
+          </div>
+
+          {/* Superficie et nombre d'espaces : les deux autres repères de la
+              ligne de synthèse de la fiche, à côté de la capacité. */}
+          <div className="grid gap-5 sm:grid-cols-2 sm:grid-rows-[auto_auto_auto] sm:gap-y-1.5">
+            <FormField
+              id="surfaceM2"
+              label="Superficie (m²)"
+              error={error("surfaceM2")}
+              hint="Facultatif, la surface totale des espaces loués."
+              className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
+            >
+              <Input
+                id="surfaceM2"
+                name="surfaceM2"
+                type="number"
+                inputMode="numeric"
+                min={ROOM_LIMITS.surface.min}
+                max={ROOM_LIMITS.surface.max}
+                step={1}
+                defaultValue={room?.surfaceM2 ?? ""}
+                placeholder="620"
+                {...fieldAria("surfaceM2", {
+                  hint: true,
+                  error: error("surfaceM2"),
+                })}
+              />
+            </FormField>
+
+            <FormField
+              id="spacesCount"
+              label="Nombre d'espaces"
+              error={error("spacesCount")}
+              hint="Facultatif : grande salle, mezzanine, jardin…"
+              className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
+            >
+              <Input
+                id="spacesCount"
+                name="spacesCount"
+                type="number"
+                inputMode="numeric"
+                min={ROOM_LIMITS.spaces.min}
+                max={ROOM_LIMITS.spaces.max}
+                step={1}
+                defaultValue={room?.spacesCount ?? ""}
+                placeholder="3"
+                {...fieldAria("spacesCount", {
+                  hint: true,
+                  error: error("spacesCount"),
+                })}
+              />
+            </FormField>
+          </div>
           </div>
         </FormSection>
 
@@ -556,6 +634,181 @@ export function RoomForm({
           </div>
         </FormSection>
 
+        <FormSection
+          id="bloc-frais"
+          title="Frais et annulation"
+          badge="Facultatif"
+          description="Ce qui s'ajoute au tarif, et ce qu'il advient si le client annule. Ces lignes paraissent dans les informations pratiques de votre fiche."
+        >
+          <div className="flex flex-col gap-5">
+            <div className="grid gap-5 sm:grid-cols-2 sm:grid-rows-[auto_auto_auto] sm:gap-y-1.5">
+              <FormField
+                id="depositAmount"
+                label="Caution (DA)"
+                error={error("depositAmount")}
+                hint="Somme demandée à la réservation, restituée après état des lieux."
+                className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
+              >
+                <Input
+                  id="depositAmount"
+                  name="depositAmount"
+                  type="number"
+                  inputMode="numeric"
+                  min={ROOM_LIMITS.price.min}
+                  step={1}
+                  defaultValue={room?.depositAmount ?? ""}
+                  placeholder="50000"
+                  {...fieldAria("depositAmount", {
+                    hint: true,
+                    error: error("depositAmount"),
+                  })}
+                />
+              </FormField>
+
+              <FormField
+                id="cleaningFee"
+                label="Frais de ménage (DA)"
+                error={error("cleaningFee")}
+                hint="Facturés en plus du tarif de location, s'il y a lieu."
+                className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
+              >
+                <Input
+                  id="cleaningFee"
+                  name="cleaningFee"
+                  type="number"
+                  inputMode="numeric"
+                  min={ROOM_LIMITS.price.min}
+                  step={1}
+                  defaultValue={room?.cleaningFee ?? ""}
+                  placeholder="15000"
+                  {...fieldAria("cleaningFee", {
+                    hint: true,
+                    error: error("cleaningFee"),
+                  })}
+                />
+              </FormField>
+            </div>
+
+            <FormField
+              id="cancellationPolicy"
+              label="Politique d'annulation"
+              error={error("cancellationPolicy")}
+              hint="En quelques mots : c'est ce que la fiche affiche en résumé."
+              className="sm:max-w-sm"
+            >
+              <Input
+                id="cancellationPolicy"
+                name="cancellationPolicy"
+                defaultValue={room?.cancellationPolicy ?? ""}
+                maxLength={ROOM_LIMITS.shortText.max}
+                placeholder="Flexible — remboursement jusqu'à 30 jours avant"
+                {...fieldAria("cancellationPolicy", {
+                  hint: true,
+                  error: error("cancellationPolicy"),
+                })}
+              />
+            </FormField>
+
+            {/* Les conditions complètes s'ouvrent dans une modale depuis la
+                fiche : elles peuvent être longues sans alourdir la page. */}
+            <FormField
+              id="cancellationTerms"
+              label="Conditions complètes"
+              error={error("cancellationTerms")}
+              hint="Le détail des délais et des remboursements, tel que le client s'y engage."
+            >
+              <Textarea
+                id="cancellationTerms"
+                name="cancellationTerms"
+                defaultValue={room?.cancellationTerms ?? ""}
+                maxLength={ROOM_LIMITS.terms.max}
+                rows={5}
+                placeholder="Annulation gratuite jusqu'à 30 jours avant l'événement…"
+                {...fieldAria("cancellationTerms", {
+                  hint: true,
+                  error: error("cancellationTerms"),
+                })}
+              />
+            </FormField>
+          </div>
+        </FormSection>
+
+        <FormSection
+          id="bloc-regles"
+          title="Règles de la salle"
+          badge="Facultatif"
+          description="Les usages que le client doit connaître avant de réserver."
+        >
+          <div className="flex flex-col gap-5">
+            <div className="grid gap-5 sm:grid-cols-2 sm:grid-rows-[auto_auto_auto] sm:gap-y-1.5">
+              <FormField
+                id="openingHours"
+                label="Horaires d'utilisation"
+                error={error("openingHours")}
+                hint="La plage pendant laquelle la salle est à disposition."
+                className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
+              >
+                <Input
+                  id="openingHours"
+                  name="openingHours"
+                  defaultValue={room?.openingHours ?? ""}
+                  maxLength={ROOM_LIMITS.shortText.max}
+                  placeholder="08:00 – 02:00"
+                  {...fieldAria("openingHours", {
+                    hint: true,
+                    error: error("openingHours"),
+                  })}
+                />
+              </FormField>
+
+              <FormField
+                id="musicPolicy"
+                label="Sonorisation"
+                error={error("musicPolicy")}
+                hint="Jusqu'à quelle heure, et à quelles conditions."
+                className="sm:row-span-3 sm:grid sm:grid-rows-subgrid"
+              >
+                <Input
+                  id="musicPolicy"
+                  name="musicPolicy"
+                  defaultValue={room?.musicPolicy ?? ""}
+                  maxLength={ROOM_LIMITS.shortText.max}
+                  placeholder="Musique autorisée jusqu'à 2h"
+                  {...fieldAria("musicPolicy", {
+                    hint: true,
+                    error: error("musicPolicy"),
+                  })}
+                />
+              </FormField>
+            </div>
+
+            {/*
+              Case à cocher plutôt que champ libre : la fiche répond « Acceptés »
+              ou « Non acceptés », il n'y a rien à nuancer.
+
+              Le parking, l'hébergement et l'accès PMR ne sont **pas** ici : ils
+              se déclarent une seule fois, dans les équipements, et la fiche les
+              en déduit — les redemander laissait la salle se contredire.
+            */}
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-gray-200 p-3 transition-colors hover:border-gray-300">
+              <input
+                type="checkbox"
+                name="petsAllowed"
+                defaultChecked={room?.petsAllowed ?? false}
+                className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded-sm border-gray-300 accent-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-gray-900">
+                  Animaux acceptés
+                </span>
+                <span className="block text-xs text-gray-500">
+                  Cochez si les animaux de compagnie sont admis dans la salle.
+                </span>
+              </span>
+            </label>
+          </div>
+        </FormSection>
+
       </StepPanel>
 
       <StepPanel index={2} current={step}>
@@ -565,10 +818,35 @@ export function RoomForm({
           badge="Recommandé"
           description="Les salles avec photos reçoivent nettement plus de demandes. La première photo sert de visuel principal."
         >
-          <PhotoUploadField
-            existing={room?.photos as ExistingPhoto[] | undefined}
-            error={error("photos")}
-          />
+          <div className="flex flex-col gap-5">
+            <PhotoUploadField
+              existing={room?.photos as ExistingPhoto[] | undefined}
+              error={error("photos")}
+            />
+
+            {/* Visite vidéo : une vignette de la galerie y renvoie, le lien
+                s'ouvrant chez l'hébergeur (YouTube, Drive…). */}
+            <FormField
+              id="videoUrl"
+              label="Visite vidéo"
+              error={error("videoUrl")}
+              hint="Facultatif — le lien d'une vidéo de la salle, déjà en ligne."
+            >
+              <Input
+                id="videoUrl"
+                name="videoUrl"
+                type="url"
+                inputMode="url"
+                defaultValue={room?.videoUrl ?? ""}
+                maxLength={ROOM_LIMITS.videoUrl.max}
+                placeholder="https://www.youtube.com/watch?v=…"
+                {...fieldAria("videoUrl", {
+                  hint: true,
+                  error: error("videoUrl"),
+                })}
+              />
+            </FormField>
+          </div>
         </FormSection>
 
         <FormSection

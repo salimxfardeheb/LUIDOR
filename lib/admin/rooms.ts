@@ -1,5 +1,6 @@
 import type { ModerationAction, RoomStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { hasEquipment, SUMMARY_EQUIPMENTS } from "@/lib/rooms/equipments";
 import type { RateValue } from "@/lib/rooms/rates";
 
 /**
@@ -365,6 +366,11 @@ export async function getAdminRoomDetail(
 
   const activeByOwner = await countActiveRoomsByOwner([room.owner.id]);
 
+  const equipments = room.equipments.map((link) => ({
+    name: link.equipment.name,
+    detail: link.detail,
+  }));
+
   return {
     id: room.id,
     name: room.name,
@@ -387,8 +393,13 @@ export async function getAdminRoomDetail(
     basePrice: Number(room.basePrice),
     surfaceM2: room.surfaceM2,
     spacesCount: room.spacesCount,
-    hasParking: room.hasParking,
-    hasAccommodation: room.hasAccommodation,
+    // Relus des équipements, comme sur la fiche publique : l'administrateur
+    // doit voir exactement ce que verra le client.
+    hasParking: hasEquipment(equipments, SUMMARY_EQUIPMENTS.parking),
+    hasAccommodation: hasEquipment(
+      equipments,
+      SUMMARY_EQUIPMENTS.accommodation
+    ),
     videoUrl: room.videoUrl,
     openingHours: room.openingHours,
     musicPolicy: room.musicPolicy,
@@ -397,12 +408,9 @@ export async function getAdminRoomDetail(
     depositAmount: room.depositAmount === null ? null : Number(room.depositAmount),
     cleaningFee: room.cleaningFee === null ? null : Number(room.cleaningFee),
     petsAllowed: room.petsAllowed,
-    wheelchairAccess: room.wheelchairAccess,
+    wheelchairAccess: hasEquipment(equipments, SUMMARY_EQUIPMENTS.wheelchair),
     photos: room.photos.map((photo) => photo.url),
-    equipments: room.equipments.map((link) => ({
-      name: link.equipment.name,
-      detail: link.detail,
-    })),
+    equipments,
     services: room.services.map((link) => ({
       name: link.service.name,
       // Le tarif de la salle prime sur celui du référentiel.

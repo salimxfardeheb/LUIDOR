@@ -7,16 +7,30 @@ import { formatDate } from "@/lib/format";
 /** Durée maximale d'une demande, en jours : au-delà, c'est du cas par cas. */
 const MAX_DAYS = 30;
 
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
 const checkSchema = z
   .object({
     roomId: z.string().min(1),
-    arrivee: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choisissez une date d'arrivée."),
-    depart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Choisissez une date de départ."),
+    arrivee: z.string().regex(ISO_DATE, "Choisissez la date de votre événement."),
+    /**
+     * Départ facultatif : une salle des fêtes se loue le plus souvent à la
+     * journée, et le formulaire n'envoie alors que la date d'arrivée. Vide, la
+     * vérification porte sur ce seul jour.
+     */
+    depart: z.union([
+      z.literal(""),
+      z.string().regex(ISO_DATE, "Choisissez une date de départ."),
+    ]),
     invites: z.coerce
       .number()
       .int("Indiquez un nombre d'invités entier.")
       .positive("Indiquez un nombre d'invités."),
   })
+  .transform((data) => ({
+    ...data,
+    depart: data.depart === "" ? data.arrivee : data.depart,
+  }))
   .refine((data) => data.depart >= data.arrivee, {
     path: ["depart"],
     message: "La date de départ doit suivre la date d'arrivée.",
@@ -71,7 +85,8 @@ export async function checkRoomAvailability(
   const parsed = checkSchema.safeParse({
     roomId: formData.get("roomId"),
     arrivee: formData.get("arrivee"),
-    depart: formData.get("depart"),
+    // Absent du FormData en mode « une journée » : le champ n'est pas rendu.
+    depart: formData.get("depart") ?? "",
     invites: formData.get("invites"),
   });
 

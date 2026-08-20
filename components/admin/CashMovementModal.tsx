@@ -45,6 +45,7 @@ export function CashMovementModal({
   alreadyRecorded,
   admins,
   currentAdminId,
+  confirmsBooking = false,
 }: {
   movement: CashMovement;
   open: boolean;
@@ -58,6 +59,8 @@ export function CashMovementModal({
   alreadyRecorded: boolean;
   admins: AdminOption[];
   currentAdminId: string;
+  /** Cet encaissement confirmera la réservation et fermera sa date. */
+  confirmsBooking?: boolean;
 }) {
   const [amount, setAmount] = React.useState(String(defaultAmount));
   const [recordedBy, setRecordedBy] = React.useState(currentAdminId);
@@ -125,6 +128,19 @@ export function CashMovementModal({
     >
       <form onSubmit={submit} className="flex flex-col gap-4">
         {error && <Alert variant="error">{error}</Alert>}
+
+        {/*
+          L'encaissement ne fait pas que consigner une somme : il confirme la
+          réservation. L'administrateur doit le savoir avant de valider, pas le
+          découvrir dans la liste.
+        */}
+        {collecting && confirmsBooking && (
+          <Alert variant="info">
+            Enregistrer cet encaissement <strong>confirme la réservation</strong>{" "}
+            et ferme la date au calendrier de la salle. Le client et le
+            propriétaire en sont informés par email.
+          </Alert>
+        )}
 
         {alreadyRecorded && (
           <Alert variant="warning">

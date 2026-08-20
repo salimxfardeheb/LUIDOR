@@ -287,6 +287,11 @@ export interface AdminBookingDetail {
   updatedAt: string;
   /** Montant attendu au tarif de la salle (base + ménage). */
   expectedAmount: number;
+  /**
+   * Prestations cochées par le client dans sa demande, à chiffrer lors de
+   * l'appel. Le tarif affiché est celui que la salle pratique aujourd'hui.
+   */
+  services: { name: string; price: number }[];
   payment: AdminPaymentSummary | null;
   room: {
     id: string;
@@ -354,6 +359,10 @@ export async function getAdminBookingDetail(
       createdAt: true,
       updatedAt: true,
       payment: { select: paymentSelect },
+      services: {
+        select: { service: { select: { id: true, name: true, price: true } } },
+        orderBy: { service: { name: "asc" } },
+      },
       room: {
         select: {
           id: true,
@@ -415,6 +424,23 @@ export async function getAdminBookingDetail(
 
   const { client, room } = booking;
 
+  /*
+   * Tarifs pratiqués par la salle pour les prestations demandées : ils vivent
+   * sur le rattachement (`RoomService.price`), pas sur la demande — une demande
+   * n'est pas un devis, et le montant se fixe au téléphone.
+   */
+  const roomServicePrices = new Map(
+    (
+      await prisma.roomService.findMany({
+        where: {
+          roomId: room.id,
+          serviceId: { in: booking.services.map((link) => link.service.id) },
+        },
+        select: { serviceId: true, price: true },
+      })
+    ).map((link) => [link.serviceId, link.price])
+  );
+
   return {
     id: booking.id,
     status: booking.status,
@@ -430,6 +456,13 @@ export async function getAdminBookingDetail(
       room.basePrice,
       room.cleaningFee
     ),
+    services: booking.services.map((link) => ({
+      name: link.service.name,
+      // Tarif de la salle s'il en a fixé un, sinon l'indicatif du référentiel.
+      price: Number(
+        roomServicePrices.get(link.service.id) ?? link.service.price
+      ),
+    })),
     payment: toPaymentSummary(booking.payment),
     room: {
       id: room.id,

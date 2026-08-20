@@ -129,6 +129,10 @@ export function CashMovementActions({
           alreadyRecorded={movement === "COLLECT" ? collected : paidOut}
           admins={admins}
           currentAdminId={currentAdminId}
+          confirmsBooking={
+            bookingStatus === "EN_ATTENTE" ||
+            bookingStatus === "EN_COURS_VERIFICATION"
+          }
         />
       )}
     </div>

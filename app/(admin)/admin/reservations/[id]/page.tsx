@@ -8,6 +8,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  Sparkles,
   Users,
 } from "lucide-react";
 import { requireAdminPage } from "@/lib/admin/guards";
@@ -174,6 +175,35 @@ export default async function Page({ params }: PageProps) {
                     label="Caution demandée"
                     value={formatPrice(room.depositAmount)}
                   />
+                )}
+
+                {/*
+                  Prestations cochées par le client : à chiffrer pendant l'appel.
+                  Le tarif affiché est celui que la salle pratique aujourd'hui,
+                  la demande n'en fige aucun.
+                */}
+                {booking.services.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <DetailRow
+                      label="Services souhaités"
+                      value={
+                        <ul className="flex flex-col gap-0.5">
+                          {booking.services.map((service) => (
+                            <li key={service.name}>
+                              {service.name}
+                              <span className="text-gray-500">
+                                {" — "}
+                                {service.price > 0
+                                  ? formatPrice(service.price)
+                                  : "sur devis"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      }
+                      icon={<Sparkles aria-hidden className="h-4 w-4" />}
+                    />
+                  </div>
                 )}
               </dl>
             </CardContent>
