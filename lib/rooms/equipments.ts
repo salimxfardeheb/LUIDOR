@@ -30,7 +30,37 @@ export const ROOM_EQUIPMENTS: readonly RoomEquipment[] = [
   { name: "Vidéoprojecteur", detailPlaceholder: "Full HD, écran de 3 m" },
   { name: "Terrasse", detailPlaceholder: "200 m² couverts" },
   { name: "Accès PMR", detailPlaceholder: "Rampe et sanitaires adaptés" },
+  { name: "Hébergement sur place", detailPlaceholder: "12 chambres" },
 ] as const;
+
+/**
+ * Équipements dont la fiche tire un repère de synthèse.
+ *
+ * La ligne de statistiques et le tableau des informations pratiques annoncent
+ * « Parking : oui/non », « Hébergement », « Accès PMR ». Ces trois faits sont
+ * déjà déclarés par le propriétaire dans la liste des équipements : les
+ * redemander ailleurs ouvrirait la porte à une fiche qui se contredit — un
+ * parking listé dans les équipements et « Parking : non » trois lignes plus
+ * haut, ce qui était le cas jusqu'ici. Les colonnes `Room.hasParking`,
+ * `hasAccommodation` et `wheelchairAccess` sont donc **déduites** de cette
+ * liste à l'enregistrement.
+ */
+export const SUMMARY_EQUIPMENTS = {
+  parking: "Parking privé",
+  accommodation: "Hébergement sur place",
+  wheelchair: "Accès PMR",
+} as const;
+
+/** La salle déclare-t-elle cet équipement ? Comparaison sans accents ni casse. */
+export function hasEquipment(
+  equipments: readonly { name: string }[],
+  target: string
+): boolean {
+  const needle = normalizeText(target);
+  return equipments.some(
+    (equipment) => normalizeText(equipment.name) === needle
+  );
+}
 
 /** Filigrane du champ de précision d'un équipement ajouté à la main. */
 export const CUSTOM_EQUIPMENT_PLACEHOLDER = "Nombre, surface, marque…";

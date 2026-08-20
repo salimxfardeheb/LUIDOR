@@ -373,6 +373,14 @@ model Service {
 model RoomService {
   roomId    String
   serviceId String
+  /// Tarif pratiqué par **cette** salle pour la prestation.
+  ///
+  /// Porté par le rattachement et non par `Service`, qui est un référentiel
+  /// partagé : le traiteur d'une salle d'Alger n'a aucune raison de fixer le
+  /// prix de celui d'Oran. `null` signifie « non fixé » et la fiche retombe
+  /// alors sur le tarif indicatif de `Service.price`, lui-même à 0 pour une
+  /// prestation ajoutée à la main — ce qui s'affiche « Sur devis ».
+  price     Decimal? @db.Decimal(10, 2)
 
   room    Room    @relation(fields: [roomId], references: [id], onDelete: Cascade)
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)

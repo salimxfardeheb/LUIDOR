@@ -1,6 +1,7 @@
 import {
   Accessibility,
   Baby,
+  BedDouble,
   Cake,
   Camera,
   CarFront,
@@ -37,6 +38,7 @@ const EQUIPMENT_ICONS: Record<string, LucideIcon> = {
   Vidéoprojecteur: Presentation,
   Terrasse: Sun,
   "Accès PMR": Accessibility,
+  "Hébergement sur place": BedDouble,
 };
 
 const SERVICE_ICONS: Record<string, LucideIcon> = {

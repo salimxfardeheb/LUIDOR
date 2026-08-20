@@ -66,6 +66,17 @@ export function equipmentDetailField(name: string): string {
 }
 
 /**
+ * Nom du champ portant le tarif d'une prestation.
+ *
+ * Même principe que `equipmentDetailField` : la clé dérive du libellé, jamais
+ * de la position, pour qu'un envoi incomplet ne puisse pas coller le prix du
+ * traiteur sur le photographe.
+ */
+export function servicePriceField(name: string): string {
+  return `servicePrice:${name}`;
+}
+
+/**
  * Nom des champs d'une ligne de la grille tarifaire.
  *
  * Une ligne est identifiée par une clé opaque produite par le formulaire, et
@@ -223,11 +234,26 @@ export const roomInputSchema = z
         `${ROOM_LIMITS.equipments.max} équipements au maximum.`
       ),
     /**
-     * Prestations : le propriétaire peut en saisir une absente du référentiel,
-     * l'action serveur crée alors la ligne `Service` correspondante.
+     * Prestations et le tarif que la salle en demande.
+     *
+     * Le propriétaire peut saisir une prestation absente du référentiel :
+     * l'action serveur crée alors la ligne `Service` correspondante. Le prix,
+     * lui, appartient au rattachement (`RoomService.price`) et non au
+     * référentiel partagé — `null` quand il n'est pas fixé.
      */
-    serviceNames: z
-      .array(label("prestation"))
+    services: z
+      .array(
+        z.object({
+          name: label("prestation"),
+          price: optionalPositiveIntFromForm("Le tarif d'une prestation")
+            .refine((value) => value === null || value >= ROOM_LIMITS.price.min, {
+              message: "Le tarif d'une prestation doit être supérieur à 0.",
+            })
+            .refine((value) => value === null || value <= ROOM_LIMITS.price.max, {
+              message: "Le tarif d'une prestation est irréaliste.",
+            }),
+        })
+      )
       .max(
         ROOM_LIMITS.services.max,
         `${ROOM_LIMITS.services.max} prestations au maximum.`
@@ -369,6 +395,31 @@ function readEquipments(
 }
 
 /**
+ * Prestations retenues et leur tarif. Même nettoyage que `readLabels`, plus la
+ * lecture du prix associé à chaque libellé — pris sur le libellé **brut**,
+ * celui que le formulaire a envoyé, avant sa remise à l'orthographe du
+ * référentiel.
+ */
+function readServices(formData: FormData): { name: string; price: string }[] {
+  const seen = new Set<string>();
+  const services: { name: string; price: string }[] = [];
+
+  for (const entry of formData.getAll("serviceNames")) {
+    const raw = text(entry).replace(/\s+/g, " ");
+    if (!raw) continue;
+
+    const name = findService(raw)?.name ?? raw;
+    const key = normalizeText(name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    services.push({ name, price: text(formData.get(servicePriceField(raw))) });
+  }
+
+  return services;
+}
+
+/**
  * Lignes de la grille tarifaire, dans l'ordre où le formulaire les a rangées.
  *
  * `rateKeys` porte l'ordre et la liste des lignes retenues ; les valeurs de
@@ -417,6 +468,9 @@ function readRates(formData: FormData): {
 
 /** Extrait les champs « salle » d'un FormData et les valide. */
 export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
+  const equipments = readEquipments(formData);
+  const services = readServices(formData);
+
   const parsed = roomInputSchema.safeParse({
     name: text(formData.get("name")),
     description: text(formData.get("description")),
@@ -430,16 +484,26 @@ export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
     capacityMin: text(formData.get("capacityMin")),
     capacityMax: text(formData.get("capacityMax")),
     basePrice: text(formData.get("basePrice")),
-    equipments: readEquipments(formData),
-    serviceNames: readLabels(
-      formData,
-      "serviceNames",
-      (value) => findService(value)?.name ?? null
-    ),
+    equipments,
+    services,
     rates: readRates(formData),
   });
 
   if (parsed.success) return { ok: true, data: parsed.data };
+
+  /**
+   * De quel élément d'un champ de liste parle l'erreur.
+   *
+   * Sans cette précision, « le tarif doit être supérieur à 0 » désignerait une
+   * prestation parmi vingt sans dire laquelle. Les équipements et les
+   * prestations se nomment — c'est ce que le propriétaire lit à l'écran ; la
+   * grille tarifaire, elle, est une suite de lignes et se compte.
+   */
+  const subject = (field: string, row: number): string => {
+    if (field === "equipments") return equipments[row]?.name ?? `Ligne ${row + 1}`;
+    if (field === "services") return services[row]?.name ?? `Ligne ${row + 1}`;
+    return `Ligne ${row + 1}`;
+  };
 
   // Un seul message par champ : le premier suffit à corriger la saisie.
   const fieldErrors: FieldErrors = {};
@@ -447,12 +511,10 @@ export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
     const field = issue.path[0];
     if (typeof field !== "string" || fieldErrors[field]) continue;
 
-    // Champ de liste (grille tarifaire, équipements) : sans le rang, le message
-    // désigne une ligne parmi douze sans dire laquelle.
     const row = issue.path[1];
     fieldErrors[field] =
       typeof row === "number"
-        ? `Ligne ${row + 1} : ${issue.message}`
+        ? `${subject(field, row)} : ${issue.message}`
         : issue.message;
   }
 

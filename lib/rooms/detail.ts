@@ -80,6 +80,10 @@ export interface RoomDetail {
   photos: string[];
   /** Équipements de la salle, avec la précision saisie par le propriétaire. */
   equipments: { name: string; detail: string | null }[];
+  /**
+   * Prestations et leur tarif : celui de la salle quand elle en a fixé un,
+   * sinon le tarif indicatif du référentiel — 0 s'affichant « Sur devis ».
+   */
   services: { id: string; name: string; price: number }[];
   /**
    * Grille tarifaire du propriétaire : ce que coûte chaque formule, quand la
@@ -118,7 +122,10 @@ const ROOM_DETAIL_INCLUDE = {
     orderBy: { equipment: { name: "asc" } },
   },
   services: {
-    select: { service: { select: { id: true, name: true, price: true } } },
+    select: {
+      price: true,
+      service: { select: { id: true, name: true, price: true } },
+    },
     orderBy: { service: { name: "asc" } },
   },
   // Ordre voulu par le propriétaire : sa grille se lit du créneau le plus
@@ -238,7 +245,8 @@ export async function getRoomDetail(id: string): Promise<RoomDetail | null> {
     services: room.services.map((link) => ({
       id: link.service.id,
       name: link.service.name,
-      price: Number(link.service.price),
+      // Le tarif de la salle prime sur celui du référentiel.
+      price: Number(link.price ?? link.service.price),
     })),
     rates: room.rates.map((rate) => ({
       id: rate.id,

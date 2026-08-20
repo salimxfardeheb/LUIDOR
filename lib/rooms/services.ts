@@ -3,14 +3,19 @@ import { normalizeText } from "@/lib/utils";
 /**
  * Référentiel des prestations proposées au propriétaire, tenu dans le code.
  *
- * Le prix est **indicatif** : il n'est porté ni par la salle ni par le
- * rattachement (`RoomService` n'a pas de colonne de prix), mais par la ligne
- * `Service` elle-même, partagée par toutes les salles. Il sert donc de repère
- * d'affichage (« À partir de… ») et non d'un tarif négocié salle par salle.
+ * Le prix qui figure ici est **indicatif** : il vit sur la ligne `Service`,
+ * partagée par toutes les salles, et ne vaut que comme ordre de grandeur. Le
+ * formulaire s'en sert pour amorcer la saisie, et la fiche pour combler un
+ * tarif que le propriétaire n'a pas fixé.
  *
- * Une prestation ajoutée par un propriétaire est créée à 0, ce que la fiche
- * affiche « Sur devis » : inventer un tarif commun à toute la plateforme à
- * partir d'une saisie individuelle serait faux.
+ * Le tarif qui fait foi pour une salle donnée est celui de son rattachement
+ * (`RoomService.price`), saisi prestation par prestation : le traiteur d'Alger
+ * n'a pas à fixer le prix de celui d'Oran.
+ *
+ * Une prestation ajoutée par un propriétaire est créée à 0 au référentiel, ce
+ * que la fiche affiche « Sur devis » tant qu'aucun tarif de salle ne la
+ * couvre : inventer un prix commun à toute la plateforme à partir d'une saisie
+ * individuelle serait faux.
  */
 
 export interface RoomService {

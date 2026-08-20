@@ -101,18 +101,23 @@ async function resolveEquipmentLinks(
 }
 
 /**
- * Le prix d'une prestation appartient à la ligne `Service`, partagée par toutes
- * les salles : il n'est donc jamais réécrit ici. Une prestation ajoutée par un
- * propriétaire naît à 0, ce que la fiche affiche « Sur devis » — le tarif reste
- * à négocier, et une saisie individuelle n'a pas à fixer un prix de plateforme.
+ * Prestations : identifiant du référentiel, et tarif propre à la salle.
+ *
+ * `Service.price` reste le tarif **indicatif** de la plateforme et n'est jamais
+ * réécrit ici : il est partagé par toutes les salles, la saisie d'un
+ * propriétaire n'a pas à le fixer pour les autres. Le prix demandé par cette
+ * salle-ci vit sur le rattachement (`RoomService.price`), comme la précision
+ * d'un équipement. Une prestation ajoutée à la main naît à 0 au référentiel,
+ * ce que la fiche affiche « Sur devis » tant qu'aucun tarif de salle ne la
+ * couvre.
  */
-async function resolveServiceIds(
+async function resolveServiceLinks(
   tx: Prisma.TransactionClient,
-  names: string[]
-): Promise<string[]> {
-  const ids: string[] = [];
+  services: RoomInput["services"]
+): Promise<{ serviceId: string; price: number | null }[]> {
+  const links: { serviceId: string; price: number | null }[] = [];
 
-  for (const name of names) {
+  for (const { name, price } of services) {
     const known = findService(name);
 
     const service = await tx.service.upsert({
@@ -122,10 +127,10 @@ async function resolveServiceIds(
       select: { id: true },
     });
 
-    ids.push(service.id);
+    links.push({ serviceId: service.id, price });
   }
 
-  return ids;
+  return links;
 }
 
 /**
@@ -260,7 +265,7 @@ async function create(formData: FormData): Promise<RoomActionResult> {
       // seule connexion, les paralléliser n'apporterait rien de sûr.
       const categoryIds = await resolveCategoryIds(tx, data.categoryNames);
       const equipmentLinks = await resolveEquipmentLinks(tx, data.equipments);
-      const serviceIds = await resolveServiceIds(tx, data.serviceNames);
+      const serviceLinks = await resolveServiceLinks(tx, data.services);
 
       return tx.room.create({
         data: {
@@ -283,7 +288,7 @@ async function create(formData: FormData): Promise<RoomActionResult> {
             create: equipmentLinks,
           },
           services: {
-            create: serviceIds.map((serviceId) => ({ serviceId })),
+            create: serviceLinks,
           },
           rates: {
             create: rateRows(data.rates),
@@ -389,7 +394,7 @@ async function update(formData: FormData): Promise<RoomActionResult> {
       // seule connexion, les paralléliser n'apporterait rien de sûr.
       const categoryIds = await resolveCategoryIds(tx, data.categoryNames);
       const equipmentLinks = await resolveEquipmentLinks(tx, data.equipments);
-      const serviceIds = await resolveServiceIds(tx, data.serviceNames);
+      const serviceLinks = await resolveServiceLinks(tx, data.services);
 
       await tx.roomCategory.deleteMany({ where: { roomId } });
       await tx.roomEquipment.deleteMany({ where: { roomId } });
@@ -416,7 +421,7 @@ async function update(formData: FormData): Promise<RoomActionResult> {
             create: equipmentLinks,
           },
           services: {
-            create: serviceIds.map((serviceId) => ({ serviceId })),
+            create: serviceLinks,
           },
           rates: {
             create: rateRows(data.rates),

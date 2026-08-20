@@ -12,6 +12,7 @@ import {
 import { EquipmentField } from "@/components/owner/EquipmentField";
 import { RateField } from "@/components/owner/RateField";
 import { RoomFormSteps } from "@/components/owner/RoomFormSteps";
+import { ServiceField } from "@/components/owner/ServiceField";
 import {
   PhotoUploadField,
   type ExistingPhoto,
@@ -23,7 +24,6 @@ import { MultiCombobox } from "@/components/ui/MultiCombobox";
 import { fieldAria, FormField, FormSection } from "@/components/ui/FormField";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
-import { formatPrice } from "@/lib/format";
 import {
   EMPTY_ROOM_FORM_PROGRESS,
   readRoomFormProgress,
@@ -38,19 +38,8 @@ import {
 import type { RoomFormValues } from "@/lib/owner/rooms";
 import { CATEGORY_OPTIONS } from "@/lib/rooms/categories";
 import { ROOM_LIMITS, type FieldErrors } from "@/lib/rooms/schemas";
-import { ROOM_SERVICES } from "@/lib/rooms/services";
 import { cn } from "@/lib/utils";
 import { WILAYA_OPTIONS } from "@/lib/wilayas";
-
-/**
- * Prestations proposées, avec leur tarif indicatif. Le tableau est constant :
- * il est construit au chargement du module, pas à chaque rendu.
- */
-const SERVICE_OPTIONS = ROOM_SERVICES.map((service) => ({
-  value: service.name,
-  hint:
-    service.price > 0 ? `À partir de ${formatPrice(service.price)}` : "Sur devis",
-}));
 
 /**
  * Formulaire salle, commun à la création et à la modification.
@@ -107,6 +96,15 @@ export function RoomForm({
   const ratesDescribedBy = fieldAria("rates", {
     hint: true,
     error: error("rates"),
+  })["aria-describedby"];
+
+  /*
+   * Les prestations n'exposent qu'un champ d'ajout comme contrôle stable : seul
+   * `aria-describedby` s'y applique, la liste entière étant faite de cases.
+   */
+  const servicesDescribedBy = fieldAria("services", {
+    hint: true,
+    error: error("services"),
   })["aria-describedby"];
 
   const formRef = React.useRef<HTMLFormElement>(null);
@@ -596,23 +594,15 @@ export function RoomForm({
           description="Prestations facturées en supplément, que vous pouvez organiser pour le client."
         >
           <FormField
-            id="serviceNames"
+            id="services"
             label="Prestations"
-            error={error("serviceNames")}
-            hint="Choisissez dans la liste, ou saisissez une prestation que vous êtes seul à proposer pour l'ajouter. Les tarifs indiqués sont ceux affichés par défaut sur la fiche ; une prestation que vous ajoutez apparaît « sur devis »."
+            error={error("services")}
+            hint="Cochez ce que vous proposez et fixez votre tarif — celui de votre salle, pas une moyenne. Laissez le montant vide pour l'afficher « sur devis ». Une prestation absente de la liste peut être ajoutée en bas."
           >
-            <MultiCombobox
-              id="serviceNames"
-              name="serviceNames"
-              options={SERVICE_OPTIONS}
-              defaultValues={room?.serviceNames}
-              placeholder="Traiteur, photographe…"
-              max={ROOM_LIMITS.services.max}
-              emptyLabel="Aucune prestation ne correspond."
-              {...fieldAria("serviceNames", {
-                hint: true,
-                error: error("serviceNames"),
-              })}
+            <ServiceField
+              id="services"
+              defaultValues={room?.services}
+              aria-describedby={servicesDescribedBy}
             />
           </FormField>
         </FormSection>

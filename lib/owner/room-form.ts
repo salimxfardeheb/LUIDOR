@@ -61,7 +61,7 @@ export const ROOM_FORM_STEPS: readonly RoomFormStep[] = [
     label: "Photos et prestations",
     description:
       "Les visuels de la salle, ses équipements et les services que vous pouvez organiser.",
-    fields: ["photos", "equipments", "serviceNames"],
+    fields: ["photos", "equipments", "services"],
   },
 ] as const;
 
@@ -91,7 +91,7 @@ export const ROOM_FIELD_LABELS: Record<string, string> = {
   rates: "Formules et créneaux",
   photos: "Photos",
   equipments: "Équipements",
-  serviceNames: "Prestations",
+  services: "Prestations",
 };
 
 /** Rang de l'étape qui traite ce champ, `null` s'il n'est rattaché à aucune. */

@@ -118,8 +118,8 @@ export interface RoomFormValues {
   status: RoomStatus;
   /** Équipements retenus, avec la précision saisie pour cette salle. */
   equipments: { name: string; detail: string | null }[];
-  /** Libellés des prestations retenues. */
-  serviceNames: string[];
+  /** Prestations retenues et le tarif que la salle en demande. */
+  services: { name: string; price: number | null }[];
   /** Grille tarifaire, dans l'ordre où le propriétaire l'a rangée. */
   rates: RateValue[];
   photos: { id: string; url: string }[];
@@ -162,7 +162,10 @@ export async function getOwnerRoomForEdit(
         select: { detail: true, equipment: { select: { name: true } } },
         orderBy: { equipment: { name: "asc" } },
       },
-      services: { select: { service: { select: { name: true } } } },
+      services: {
+        select: { price: true, service: { select: { name: true } } },
+        orderBy: { service: { name: "asc" } },
+      },
       rates: {
         select: { label: true, detail: true, price: true, unit: true },
         orderBy: { position: "asc" },
@@ -201,7 +204,10 @@ export async function getOwnerRoomForEdit(
         name: link.equipment.name,
         detail: link.detail,
       })),
-      serviceNames: room.services.map((link) => link.service.name),
+      services: room.services.map((link) => ({
+        name: link.service.name,
+        price: link.price === null ? null : Number(link.price),
+      })),
       rates: room.rates.map((rate) => ({
         label: rate.label,
         detail: rate.detail,

@@ -327,7 +327,10 @@ export async function getAdminRoomDetail(
         orderBy: { equipment: { name: "asc" } },
       },
       services: {
-        select: { service: { select: { name: true, price: true } } },
+        select: {
+          price: true,
+          service: { select: { name: true, price: true } },
+        },
         orderBy: { service: { name: "asc" } },
       },
       rates: {
@@ -402,7 +405,8 @@ export async function getAdminRoomDetail(
     })),
     services: room.services.map((link) => ({
       name: link.service.name,
-      price: Number(link.service.price),
+      // Le tarif de la salle prime sur celui du référentiel.
+      price: Number(link.price ?? link.service.price),
     })),
     rates: room.rates.map((rate) => ({
       id: rate.id,
