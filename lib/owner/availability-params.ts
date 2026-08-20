@@ -18,6 +18,28 @@ export const AVAILABILITY_PARAMS = { room: "salle", month: "mois" } as const;
 /** Nombre de mois ouverts à la gestion, mois courant inclus. */
 export const CALENDAR_MONTH_SPAN = 12;
 
+/**
+ * Dernière date modifiable : dernier jour du mois courant + 11 mois.
+ *
+ * Bornes l'entrée « Du / Au » côté client (attribut `max`) comme côté serveur
+ * (gardé dans l'action de période) : au-delà, le propriétaire n'a rien à
+ * gérer, la fenêtre gérable s'arrête là.
+ */
+export function lastEditableDate(): string {
+  const now = new Date();
+  const lastMonth = new Date(
+    Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth() + CALENDAR_MONTH_SPAN - 1,
+      1
+    )
+  );
+  const lastDay = new Date(
+    Date.UTC(lastMonth.getUTCFullYear(), lastMonth.getUTCMonth() + 1, 0)
+  );
+  return lastDay.toISOString().slice(0, 10);
+}
+
 /** Initiales des jours, semaine démarrant le lundi. */
 export const WEEKDAY_INITIALS = ["L", "M", "M", "J", "V", "S", "D"] as const;
 
