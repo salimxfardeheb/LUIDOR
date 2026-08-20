@@ -81,8 +81,11 @@ export default async function Page({ params }: PageProps) {
         </div>
       </PageHeader>
 
+      {/* `min-w-0` sur les colonnes : un élément de grille refuse par défaut de
+          descendre sous la largeur de son contenu, et une adresse ou un email
+          long élargirait alors la colonne — donc la page entière. */}
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="flex flex-col gap-6 lg:col-span-2">
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle>Détail de la réservation</CardTitle>
@@ -252,7 +255,7 @@ export default async function Page({ params }: PageProps) {
           </Card>
         </div>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex min-w-0 flex-col gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Détail du client</CardTitle>

@@ -29,6 +29,7 @@ export function CashMovementActions({
   payment,
   admins,
   currentAdminId,
+  compact = false,
   className,
 }: {
   bookingId: string;
@@ -41,6 +42,13 @@ export function CashMovementActions({
   payment: AdminPaymentSummary | null;
   admins: AdminOption[];
   currentAdminId: string;
+  /**
+   * Rendu resserré, pour une ligne de tableau : le geste qui reste à faire
+   * garde son libellé, une étape déjà franchie se réduit à son icône. Sans
+   * cela, quatre libellés complets font à eux seuls le tiers de la largeur du
+   * tableau, et les autres colonnes se compriment jusqu'à casser.
+   */
+  compact?: boolean;
   className?: string;
 }) {
   const router = useRouter();
@@ -66,32 +74,32 @@ export function CashMovementActions({
   return (
     <div className={cn("flex flex-col items-end gap-2", className)}>
       <div className="flex flex-wrap justify-end gap-2">
-        <Button
-          type="button"
-          variant={collected ? "ghost" : "secondary"}
-          size="sm"
+        <MovementButton
+          done={collected}
+          compact={compact}
+          tone="secondary"
+          doneLabel="Corriger l'encaissement"
+          todoLabel={compact ? "Encaisser" : "Encaisser le client"}
+          icon={<Banknote aria-hidden className="h-4 w-4" />}
           onClick={() => {
             setSuccess(null);
             setMovement("COLLECT");
           }}
-        >
-          <Banknote aria-hidden className="h-4 w-4" />
-          {collected ? "Corriger l'encaissement" : "Encaisser le client"}
-        </Button>
+        />
 
         {collected && (
-          <Button
-            type="button"
-            variant={paidOut ? "ghost" : "primary"}
-            size="sm"
+          <MovementButton
+            done={paidOut}
+            compact={compact}
+            tone="primary"
+            doneLabel="Corriger le reversement"
+            todoLabel={compact ? "Reverser" : "Reverser au propriétaire"}
+            icon={<HandCoins aria-hidden className="h-4 w-4" />}
             onClick={() => {
               setSuccess(null);
               setMovement("PAYOUT");
             }}
-          >
-            <HandCoins aria-hidden className="h-4 w-4" />
-            {paidOut ? "Corriger le reversement" : "Reverser au propriétaire"}
-          </Button>
+          />
         )}
       </div>
 
@@ -124,5 +132,53 @@ export function CashMovementActions({
         />
       )}
     </div>
+  );
+}
+
+/**
+ * Bouton d'un mouvement d'espèces.
+ *
+ * En mode resserré, une étape déjà franchie tombe à l'icône seule : la
+ * correction est un geste rare, elle n'a pas à occuper la largeur d'un libellé
+ * dans chaque ligne. Le texte complet reste porté par `title` et par le nom
+ * accessible du bouton — rien ne disparaît, seul l'encombrement change.
+ */
+function MovementButton({
+  done,
+  compact,
+  tone,
+  doneLabel,
+  todoLabel,
+  icon,
+  onClick,
+}: {
+  done: boolean;
+  compact: boolean;
+  /** Marine pour l'encaissement, or pour le reversement : les deux jambes du
+   *  circuit ne se confondent pas d'un coup d'œil. */
+  tone: "secondary" | "primary";
+  doneLabel: string;
+  todoLabel: string;
+  icon: React.ReactNode;
+  onClick: () => void;
+}) {
+  const iconOnly = compact && done;
+
+  return (
+    <Button
+      type="button"
+      variant={done ? "ghost" : tone}
+      size="sm"
+      title={done ? doneLabel : undefined}
+      className={iconOnly ? "px-2" : undefined}
+      onClick={onClick}
+    >
+      {icon}
+      {iconOnly ? (
+        <span className="sr-only">{doneLabel}</span>
+      ) : (
+        <>{done ? doneLabel : todoLabel}</>
+      )}
+    </Button>
   );
 }

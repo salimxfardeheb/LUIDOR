@@ -2,7 +2,7 @@ import type { ModerationAction } from "@prisma/client";
 import { History } from "lucide-react";
 import type { ModerationEntry } from "@/lib/admin/rooms";
 import { RoomThumbnail } from "@/components/admin/RoomThumbnail";
-import { ADMIN_TH } from "@/components/admin/table";
+import { ADMIN_TABLE_SCROLL, ADMIN_TH } from "@/components/admin/table";
 import { RoomStatusBadge } from "@/components/owner/RoomStatusBadge";
 import { Badge, type BadgeProps } from "@/components/ui/Badge";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
@@ -43,7 +43,7 @@ export function ModerationHistoryTable({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className={ADMIN_TABLE_SCROLL}>
       <table className="w-full min-w-[880px] text-sm">
         <caption className="sr-only">
           Décisions de validation et de rejet déjà prononcées, de la plus

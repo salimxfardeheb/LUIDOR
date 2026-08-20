@@ -3,7 +3,10 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
+  // `whitespace-nowrap` : une pastille `rounded-full` dont le texte passe à la
+  // ligne perd sa forme et son texte sort de l'arrondi. Un badge est un libellé
+  // court — il tient sur une ligne, ou la colonne s'élargit.
+  "inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors",
   {
     variants: {
       variant: {

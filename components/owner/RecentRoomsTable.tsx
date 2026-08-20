@@ -31,7 +31,9 @@ export function RecentRoomsTable({ rooms }: { rooms: RecentRoomRow[] }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    // `relative` : sans bloc conteneur, les libellés `sr-only` du tableau
+    // échapperaient au découpage du défilement et étireraient la page.
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[560px] text-sm">
         <caption className="sr-only">
           Dernières salles déposées, avec ville, date de dépôt et statut.

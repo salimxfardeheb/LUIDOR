@@ -14,3 +14,14 @@ export const ADMIN_TH_RIGHT =
 /** Lien d'action en bout de ligne, rendu sous forme d'icône. */
 export const ADMIN_ROW_ACTION =
   "rounded-md p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60";
+
+/**
+ * Conteneur de défilement horizontal d'un tableau.
+ *
+ * `relative` n'est pas décoratif : les libellés `sr-only` des cellules sont
+ * positionnés en absolu, et sans bloc conteneur à l'intérieur du scroller ils
+ * se rattachent à un ancêtre situé *hors* de lui. Ils échappent alors au
+ * découpage du défilement et étirent la largeur du document — la page entière
+ * défile latéralement alors que seul le tableau devrait le faire.
+ */
+export const ADMIN_TABLE_SCROLL = "relative overflow-x-auto";

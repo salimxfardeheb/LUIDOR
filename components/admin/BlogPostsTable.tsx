@@ -3,14 +3,14 @@ import Link from "next/link";
 import { FileText, Pencil } from "lucide-react";
 import type { AdminPostRow } from "@/lib/admin/blog";
 import { BlogPostActions } from "@/components/admin/BlogPostActions";
-import { ADMIN_ROW_ACTION, ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
+import { ADMIN_ROW_ACTION, ADMIN_TABLE_SCROLL, ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
 import { Badge } from "@/components/ui/Badge";
 import { formatDate, formatNumber } from "@/lib/format";
 
 /** Liste des articles : brouillons en tête, puis publications récentes. */
 export function BlogPostsTable({ posts }: { posts: AdminPostRow[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className={ADMIN_TABLE_SCROLL}>
       <table className="w-full min-w-[820px] text-sm">
         <caption className="sr-only">
           Articles du blog, avec leur état de publication et leur adresse.

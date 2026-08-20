@@ -3,7 +3,7 @@ import type { AdminOption } from "@/lib/admin/bookings";
 import type { PaymentRow } from "@/lib/admin/payments";
 import { CashMovementActions } from "@/components/admin/CashMovementActions";
 import { PaymentStageBadge } from "@/components/admin/PaymentStageBadge";
-import { ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
+import { ADMIN_TABLE_SCROLL, ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDate, formatPrice } from "@/lib/format";
 
@@ -25,7 +25,7 @@ export function PaymentsTable({
   currentAdminId: string;
 }) {
   return (
-    <div className="overflow-x-auto">
+    <div className={ADMIN_TABLE_SCROLL}>
       <table className="w-full min-w-[1100px] text-sm">
         <caption className="sr-only">
           Paiements en espèces des réservations : somme reçue du client, somme
@@ -139,6 +139,7 @@ export function PaymentsTable({
               </td>
               <td className="py-3">
                 <CashMovementActions
+                  compact
                   bookingId={row.bookingId}
                   clientName={row.clientName}
                   roomName={row.roomName}

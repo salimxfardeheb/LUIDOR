@@ -3,7 +3,7 @@ import { Building2, CalendarCheck } from "lucide-react";
 import type { AdminOwnerRow } from "@/lib/admin/users";
 import { AccountStatusBadge } from "@/components/admin/AccountBadges";
 import { UserSuspendButton } from "@/components/admin/UserSuspendButton";
-import { ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
+import { ADMIN_TABLE_SCROLL, ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { formatNumber } from "@/lib/format";
@@ -17,7 +17,7 @@ import { formatNumber } from "@/lib/format";
  */
 export function OwnersTable({ owners }: { owners: AdminOwnerRow[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className={ADMIN_TABLE_SCROLL}>
       <table className="w-full min-w-[900px] text-sm">
         <caption className="sr-only">
           Propriétaires de la plateforme, avec le nombre de salles, le nombre de

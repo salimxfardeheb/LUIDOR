@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LifeBuoy, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/ui/Logo";
 import { BackToSiteLink } from "@/components/layout/BackToSiteLink";
 import { SidebarAccount } from "@/components/layout/SidebarAccount";
@@ -129,35 +129,18 @@ export function AdminSidebar() {
           ))}
         </nav>
 
-        <SidebarHelpCard />
+        {/*
+          Un seul filet pour le pied de colonne : la sortie vers le site et le
+          compte forment un même bloc, sous la navigation. Deux traits à douze
+          pixels d'écart enfermaient le lien dans une bande à part.
 
-        <BackToSiteLink onDark className="mt-3 border-t border-white/10 pt-3" />
-
-        {/* Colonne marine : le menu compte bascule sur ses variantes claires. */}
-        <SidebarAccount onDark className="border-t border-white/10 pt-3" />
+          Colonne marine : le menu compte bascule sur ses variantes claires.
+        */}
+        <div className="mt-3 flex flex-col gap-1 border-t border-white/10 pt-3">
+          <BackToSiteLink onDark />
+          <SidebarAccount onDark />
+        </div>
       </aside>
     </>
-  );
-}
-
-/** Bloc d'aide en pied de colonne : la sortie vers le support humain. */
-function SidebarHelpCard() {
-  return (
-    <div className="mt-6 rounded-lg bg-white/10 p-4">
-      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary text-primary-900">
-        <LifeBuoy aria-hidden className="h-5 w-5" />
-      </span>
-      <p className="mt-3 text-sm font-semibold text-white">Besoin d&apos;aide ?</p>
-      <p className="mt-1 text-xs leading-relaxed text-gray-300">
-        Une question sur la modération d&apos;une salle ou sur un compte ?
-        L&apos;équipe LIUDOR vous répond.
-      </p>
-      <Link
-        href="/contact"
-        className="mt-3 inline-flex w-full items-center justify-center rounded-md bg-secondary px-3 py-2 text-xs font-semibold text-primary-900 transition-colors hover:bg-secondary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-primary-900"
-      >
-        Contacter le support
-      </Link>
-    </div>
   );
 }

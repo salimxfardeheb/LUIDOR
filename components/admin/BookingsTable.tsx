@@ -3,7 +3,7 @@ import { ArrowRight } from "lucide-react";
 import type { AdminBookingRow } from "@/lib/admin/bookings";
 import { BookingDecisionActions } from "@/components/admin/BookingDecisionActions";
 import { PaymentStageBadge } from "@/components/admin/PaymentStageBadge";
-import { ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
+import { ADMIN_TABLE_SCROLL, ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
 import { BookingStatusBadge } from "@/components/dashboard/BookingStatusBadge";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDate, formatNumber, formatPrice } from "@/lib/format";
@@ -21,7 +21,7 @@ import { formatDate, formatNumber, formatPrice } from "@/lib/format";
  */
 export function BookingsTable({ bookings }: { bookings: AdminBookingRow[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className={ADMIN_TABLE_SCROLL}>
       <table className="w-full min-w-[1100px] text-sm">
         <caption className="sr-only">
           Réservations de la plateforme, avec client, salle, date

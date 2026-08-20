@@ -3,7 +3,7 @@ import { CalendarCheck } from "lucide-react";
 import type { AdminClientRow } from "@/lib/admin/users";
 import { AccountStatusBadge } from "@/components/admin/AccountBadges";
 import { UserSuspendButton } from "@/components/admin/UserSuspendButton";
-import { ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
+import { ADMIN_TABLE_SCROLL, ADMIN_TH, ADMIN_TH_RIGHT } from "@/components/admin/table";
 import { Avatar } from "@/components/ui/Avatar";
 import { formatDate, formatNumber, formatPrice } from "@/lib/format";
 
@@ -16,7 +16,7 @@ import { formatDate, formatNumber, formatPrice } from "@/lib/format";
  */
 export function ClientsTable({ clients }: { clients: AdminClientRow[] }) {
   return (
-    <div className="overflow-x-auto">
+    <div className={ADMIN_TABLE_SCROLL}>
       <table className="w-full min-w-[900px] text-sm">
         <caption className="sr-only">
           Clients de la plateforme, avec leurs réservations, le montant encaissé

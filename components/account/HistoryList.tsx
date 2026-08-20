@@ -61,7 +61,9 @@ export function HistoryList({ entries }: { entries: AccountHistoryEntry[] }) {
         ))}
       </ul>
 
-      <div className="hidden overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm md:block">
+      {/* `relative` : sans bloc conteneur, les libellés `sr-only` du tableau
+          échapperaient au découpage du défilement et étireraient la page. */}
+      <div className="relative hidden overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm md:block">
         <table className="w-full text-sm">
           <caption className="sr-only">
             Historique de vos réservations terminées ou annulées : salle, date,
