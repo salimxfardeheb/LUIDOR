@@ -120,7 +120,8 @@ export async function submitBookingRequest(
         },
       };
     }
-    if (guestsCount < room.capacityMin) {
+    // `null` = la salle n'annonce aucun minimum, rien à opposer au client.
+    if (room.capacityMin !== null && guestsCount < room.capacityMin) {
       return {
         ok: false,
         message: "Vérifiez les informations saisies.",

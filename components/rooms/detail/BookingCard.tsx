@@ -44,7 +44,8 @@ export function BookingCard({
   roomId: string;
   roomName: string;
   basePrice: number;
-  capacityMin: number;
+  /** `null` quand la salle n'annonce pas de minimum. */
+  capacityMin: number | null;
   capacityMax: number;
   /** Types d'événement proposés dans la demande (catégories de la plateforme). */
   eventTypes: string[];
@@ -153,11 +154,16 @@ export function BookingCard({
             id="invites"
             name="invites"
             type="number"
-            min={capacityMin}
+            // Sans minimum annoncé, le plancher est celui du bon sens : un invité.
+            min={capacityMin ?? 1}
             max={capacityMax}
             step={1}
             inputMode="numeric"
-            placeholder={`${capacityMin} – ${capacityMax}`}
+            placeholder={
+              capacityMin === null
+                ? `Jusqu'à ${capacityMax}`
+                : `${capacityMin} – ${capacityMax}`
+            }
             required
           />
         </Field>

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { findCategory } from "@/lib/rooms/categories";
 import { findEquipment } from "@/lib/rooms/equipments";
+import { DEFAULT_RATE_UNIT, RATE_UNIT_VALUES } from "@/lib/rooms/rates";
 import { findService } from "@/lib/rooms/services";
 import { normalizeText } from "@/lib/utils";
 import { findWilaya } from "@/lib/wilayas";
@@ -27,6 +28,10 @@ export const ROOM_LIMITS = {
   categories: { max: 9 },
   equipments: { max: 30 },
   services: { max: 20 },
+  /** Intitulé d'une formule tarifaire : « Dîner et demi-soirée pour les 2 salles ». */
+  rateLabel: { min: 3, max: 70 },
+  /** Lignes de la grille tarifaire d'une salle. */
+  rates: { max: 12 },
   capacity: { min: 1, max: 100_000 },
   price: { min: 1, max: 100_000_000 },
 } as const;
@@ -61,6 +66,22 @@ export function equipmentDetailField(name: string): string {
 }
 
 /**
+ * Nom des champs d'une ligne de la grille tarifaire.
+ *
+ * Une ligne est identifiée par une clé opaque produite par le formulaire, et
+ * non par sa position : les lignes s'ajoutent et se retirent librement, et un
+ * envoi auquel il manque un champ ne doit pas décaler le tarif d'une formule
+ * sur une autre. L'ordre d'affichage est porté à part, par les valeurs du champ
+ * `rateKeys`.
+ */
+export function rateField(
+  key: string,
+  part: "label" | "detail" | "price" | "unit"
+): string {
+  return `rate:${key}:${part}`;
+}
+
+/**
  * Libellé de référentiel : catégorie, équipement ou prestation. Les trois
  * champs voyagent en clair — le formulaire n'envoie plus d'identifiants — donc
  * ils partagent les mêmes bornes.
@@ -75,6 +96,18 @@ const label = (subject: string) =>
     .max(
       ROOM_LIMITS.label.max,
       `Un nom de ${subject} est limité à ${ROOM_LIMITS.label.max} caractères.`
+    );
+
+/**
+ * Entier facultatif : le champ laissé vide vaut `null`, et n'est contrôlé que
+ * s'il porte une valeur.
+ */
+const optionalPositiveIntFromForm = (label: string) =>
+  z
+    .string()
+    .transform((value) => (value === "" ? null : value))
+    .pipe(
+      z.union([z.null(), positiveIntFromForm(label)])
     );
 
 const positiveIntFromForm = (label: string) =>
@@ -141,11 +174,16 @@ export const roomInputSchema = z
         ROOM_LIMITS.categories.max,
         `${ROOM_LIMITS.categories.max} catégories au maximum.`
       ),
-    capacityMin: positiveIntFromForm("La capacité minimum")
-      .refine((value) => value >= ROOM_LIMITS.capacity.min, {
+    /**
+     * Capacité minimum, **facultative** : une salle n'annonce le plus souvent
+     * qu'un plafond. Une chaîne vide devient `null` — « aucun minimum » — et
+     * non 1, qui ferait afficher une fourchette que personne n'a saisie.
+     */
+    capacityMin: optionalPositiveIntFromForm("La capacité minimum")
+      .refine((value) => value === null || value >= ROOM_LIMITS.capacity.min, {
         message: "La capacité minimum doit être d'au moins 1 invité.",
       })
-      .refine((value) => value <= ROOM_LIMITS.capacity.max, {
+      .refine((value) => value === null || value <= ROOM_LIMITS.capacity.max, {
         message: "La capacité minimum est irréaliste.",
       }),
     capacityMax: positiveIntFromForm("La capacité maximum")
@@ -194,11 +232,67 @@ export const roomInputSchema = z
         ROOM_LIMITS.services.max,
         `${ROOM_LIMITS.services.max} prestations au maximum.`
       ),
+    /**
+     * Grille tarifaire : une ligne par formule proposée (« Location soirée,
+     * 21h – 3h, 270 000 DA »).
+     *
+     * Facultative — beaucoup de salles s'en tiennent au prix de base — et sans
+     * référentiel partagé : libellé comme tarif n'appartiennent qu'à cette
+     * salle. L'ordre reçu est celui de la grille et devient `RoomRate.position`.
+     */
+    rates: z
+      .array(
+        z.object({
+          label: z
+            .string()
+            .min(
+              ROOM_LIMITS.rateLabel.min,
+              `Un intitulé de formule doit contenir au moins ${ROOM_LIMITS.rateLabel.min} caractères.`
+            )
+            .max(
+              ROOM_LIMITS.rateLabel.max,
+              `Un intitulé de formule est limité à ${ROOM_LIMITS.rateLabel.max} caractères.`
+            ),
+          detail: z
+            .string()
+            .max(
+              ROOM_LIMITS.detail.max,
+              `Un créneau est limité à ${ROOM_LIMITS.detail.max} caractères.`
+            )
+            .nullable(),
+          price: positiveIntFromForm("Le tarif de la formule")
+            .refine((value) => value >= ROOM_LIMITS.price.min, {
+              message: "Le tarif d'une formule doit être supérieur à 0.",
+            })
+            .refine((value) => value <= ROOM_LIMITS.price.max, {
+              message: "Le tarif de la formule est irréaliste.",
+            }),
+          unit: z.enum(RATE_UNIT_VALUES, {
+            error: "Choisissez une unité de facturation dans la liste.",
+          }),
+        })
+      )
+      .max(
+        ROOM_LIMITS.rates.max,
+        `${ROOM_LIMITS.rates.max} formules tarifaires au maximum.`
+      ),
   })
-  .refine((data) => data.capacityMin <= data.capacityMax, {
-    path: ["capacityMax"],
-    message: "La capacité maximum doit être supérieure ou égale au minimum.",
-  });
+  .refine(
+    /*
+     * Deux échappatoires avant la comparaison : `null` — aucun minimum annoncé,
+     * il n'y a rien à comparer — et `NaN`, que produit une saisie non numérique.
+     * Sans elles, une capacité minimum illisible ferait aussi accuser la
+     * capacité maximum, qui n'y est pour rien.
+     */
+    (data) =>
+      data.capacityMin === null ||
+      Number.isNaN(data.capacityMin) ||
+      data.capacityMin <= data.capacityMax,
+    {
+      path: ["capacityMax"],
+      message: "La capacité maximum doit être supérieure ou égale au minimum.",
+    }
+  );
 
 export type RoomInput = z.infer<typeof roomInputSchema>;
 
@@ -274,6 +368,53 @@ function readEquipments(
   return equipments;
 }
 
+/**
+ * Lignes de la grille tarifaire, dans l'ordre où le formulaire les a rangées.
+ *
+ * `rateKeys` porte l'ordre et la liste des lignes retenues ; les valeurs de
+ * chaque ligne se lisent ensuite par clé (`rateField`). Une ligne entièrement
+ * vide — le propriétaire a ouvert une formule puis changé d'avis — est ignorée
+ * plutôt que refusée : elle ne dit rien, elle n'a pas à bloquer l'envoi.
+ */
+function readRates(formData: FormData): {
+  label: string;
+  detail: string | null;
+  price: string;
+  unit: string;
+}[] {
+  const seen = new Set<string>();
+  const rates: {
+    label: string;
+    detail: string | null;
+    price: string;
+    unit: string;
+  }[] = [];
+
+  for (const entry of formData.getAll("rateKeys")) {
+    const key = text(entry);
+    // Une clé forgée en double ferait lire deux fois la même ligne.
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+
+    const label = text(formData.get(rateField(key, "label"))).replace(
+      /\s+/g,
+      " "
+    );
+    const price = text(formData.get(rateField(key, "price")));
+    if (!label && !price) continue;
+
+    const detail = text(formData.get(rateField(key, "detail"))).replace(
+      /\s+/g,
+      " "
+    );
+    const unit = text(formData.get(rateField(key, "unit"))) || DEFAULT_RATE_UNIT;
+
+    rates.push({ label, detail: detail || null, price, unit });
+  }
+
+  return rates;
+}
+
 /** Extrait les champs « salle » d'un FormData et les valide. */
 export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
   const parsed = roomInputSchema.safeParse({
@@ -295,6 +436,7 @@ export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
       "serviceNames",
       (value) => findService(value)?.name ?? null
     ),
+    rates: readRates(formData),
   });
 
   if (parsed.success) return { ok: true, data: parsed.data };
@@ -303,9 +445,15 @@ export function parseRoomForm(formData: FormData): ParseResult<RoomInput> {
   const fieldErrors: FieldErrors = {};
   for (const issue of parsed.error.issues) {
     const field = issue.path[0];
-    if (typeof field === "string" && !fieldErrors[field]) {
-      fieldErrors[field] = issue.message;
-    }
+    if (typeof field !== "string" || fieldErrors[field]) continue;
+
+    // Champ de liste (grille tarifaire, équipements) : sans le rang, le message
+    // désigne une ligne parmi douze sans dire laquelle.
+    const row = issue.path[1];
+    fieldErrors[field] =
+      typeof row === "number"
+        ? `Ligne ${row + 1} : ${issue.message}`
+        : issue.message;
   }
 
   return {

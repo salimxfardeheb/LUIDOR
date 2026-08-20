@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { Prisma, RateUnit } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   ROOM_SUMMARY_SELECT,
@@ -58,7 +58,8 @@ export interface RoomDetail {
   address: string;
   latitude: number | null;
   longitude: number | null;
-  capacityMin: number;
+  /** `null` quand la salle n'annonce pas de minimum. */
+  capacityMin: number | null;
   capacityMax: number;
   basePrice: number;
   surfaceM2: number | null;
@@ -80,6 +81,17 @@ export interface RoomDetail {
   /** Équipements de la salle, avec la précision saisie par le propriétaire. */
   equipments: { name: string; detail: string | null }[];
   services: { id: string; name: string; price: number }[];
+  /**
+   * Grille tarifaire du propriétaire : ce que coûte chaque formule, quand la
+   * salle ne se loue pas à un prix unique. Vide pour la plupart des salles.
+   */
+  rates: {
+    id: string;
+    label: string;
+    detail: string | null;
+    price: number;
+    unit: RateUnit;
+  }[];
   rating: number | null;
   reviewCount: number;
   ratingBreakdown: RatingBucket[];
@@ -108,6 +120,12 @@ const ROOM_DETAIL_INCLUDE = {
   services: {
     select: { service: { select: { id: true, name: true, price: true } } },
     orderBy: { service: { name: "asc" } },
+  },
+  // Ordre voulu par le propriétaire : sa grille se lit du créneau le plus
+  // courant au plus rare, pas par ordre alphabétique ni par prix.
+  rates: {
+    select: { id: true, label: true, detail: true, price: true, unit: true },
+    orderBy: { position: "asc" },
   },
   reviews: {
     // Seuls les avis publiés paraissent sur la fiche : un avis en attente de
@@ -221,6 +239,13 @@ export async function getRoomDetail(id: string): Promise<RoomDetail | null> {
       id: link.service.id,
       name: link.service.name,
       price: Number(link.service.price),
+    })),
+    rates: room.rates.map((rate) => ({
+      id: rate.id,
+      label: rate.label,
+      detail: rate.detail,
+      price: Number(rate.price),
+      unit: rate.unit,
     })),
     rating: reviewCount > 0 ? ratingTotal / reviewCount : null,
     reviewCount,

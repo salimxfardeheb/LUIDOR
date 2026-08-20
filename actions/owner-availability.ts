@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import type { AvailabilityStatus } from "@prisma/client";
+import type { AvailabilityStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import {
   AVAILABILITY_PATH,
@@ -110,9 +110,7 @@ export async function toggleDateAvailability(
       update: { status },
     });
 
-    revalidatePath(AVAILABILITY_PATH);
-    // La fiche publique affiche le même calendrier : elle doit suivre.
-    revalidatePath(`/salles/${roomId}`);
+    revalidateAvailability(roomId);
 
     return { ok: true, date, status };
   } catch (error) {
@@ -202,7 +200,11 @@ export async function setDateRangeAvailability(
 
   const targetStatus: AvailabilityStatus = open ? "AVAILABLE" : "BLOCKED";
 
-  const toUpsert: Date[] = [];
+  // Deux listes plutôt qu'une : les dates déjà enregistrées se mettent à jour
+  // en une requête, les autres se créent en une seconde. Une période d'un an
+  // ferait sinon 366 allers-retours `upsert` dans la même transaction.
+  const toUpdate: Date[] = [];
+  const toCreate: Date[] = [];
   const applied: Array<{ date: string; status: AvailabilityStatus }> = [];
   let opened = 0;
   let closed = 0;
@@ -228,23 +230,41 @@ export async function setDateRangeAvailability(
 
     // Copie : l'itérateur mute `day` en fin de tour, Prisma lirait sinon
     // toujours la dernière valeur pour toutes les lignes de la transaction.
-    toUpsert.push(new Date(day.getTime()));
+    const value = new Date(day.getTime());
+    if (current === null) toCreate.push(value);
+    else toUpdate.push(value);
+
     applied.push({ date, status: targetStatus });
     if (targetStatus === "AVAILABLE") opened += 1;
     else closed += 1;
   }
 
-  if (toUpsert.length > 0) {
-    try {
-      await prisma.$transaction(
-        toUpsert.map((date) =>
-          prisma.availability.upsert({
-            where: { roomId_date: { roomId, date } },
-            create: { roomId, date, status: targetStatus },
-            update: { status: targetStatus },
-          })
-        )
+  if (applied.length > 0) {
+    // Typé explicitement : un tableau vide serait sinon inféré `any[]`.
+    const operations: Prisma.PrismaPromise<unknown>[] = [];
+
+    if (toUpdate.length > 0) {
+      operations.push(
+        prisma.availability.updateMany({
+          where: { roomId, date: { in: toUpdate } },
+          data: { status: targetStatus },
+        })
       );
+    }
+
+    if (toCreate.length > 0) {
+      operations.push(
+        prisma.availability.createMany({
+          data: toCreate.map((date) => ({ roomId, date, status: targetStatus })),
+          // Une ligne créée entre-temps par un autre onglet ne doit pas faire
+          // échouer toute la période : elle est simplement laissée telle quelle.
+          skipDuplicates: true,
+        })
+      );
+    }
+
+    try {
+      await prisma.$transaction(operations);
     } catch (error) {
       console.error("[owner/disponibilites] mise à jour de période échouée", error);
       return {
@@ -254,9 +274,20 @@ export async function setDateRangeAvailability(
     }
   }
 
-  revalidatePath(AVAILABILITY_PATH);
-  // La fiche publique affiche le même calendrier : elle doit suivre.
-  revalidatePath(`/salles/${roomId}`);
+  revalidateAvailability(roomId);
 
   return { ok: true, opened, closed, skipped, dates: applied };
+}
+
+/**
+ * Pages à rafraîchir après une modification de disponibilité.
+ *
+ * La fiche publique affiche le même calendrier et le tableau de bord compte
+ * les dates ouvertes des trente prochains jours : les trois vues dépendent de
+ * la même donnée, elles sont invalidées ensemble plutôt qu'au cas par cas.
+ */
+function revalidateAvailability(roomId: string): void {
+  revalidatePath(AVAILABILITY_PATH);
+  revalidatePath(`/salles/${roomId}`);
+  revalidatePath("/owner/dashboard");
 }

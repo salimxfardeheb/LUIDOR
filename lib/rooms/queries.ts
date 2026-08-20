@@ -62,10 +62,19 @@ function buildWhere(filters: RoomFilters): Prisma.RoomWhereInput {
     conditions.push({ categories: { some: { category: { name: filters.type } } } });
   }
 
-  // Nombre d'invités : la fourchette de la salle doit l'englober.
+  /*
+   * Nombre d'invités : la fourchette de la salle doit l'englober.
+   *
+   * Le `OR` sur le minimum n'est pas une précaution de style : en SQL, une
+   * comparaison avec NULL n'est jamais vraie, et une salle sans minimum — la
+   * majorité — disparaîtrait des résultats au lieu d'y figurer toujours.
+   */
   if (filters.invites) {
     conditions.push({
-      capacityMin: { lte: filters.invites },
+      OR: [
+        { capacityMin: null },
+        { capacityMin: { lte: filters.invites } },
+      ],
       capacityMax: { gte: filters.invites },
     });
   }
@@ -75,7 +84,12 @@ function buildWhere(filters: RoomFilters): Prisma.RoomWhereInput {
     conditions.push({ capacityMax: { gte: filters.capaciteMin } });
   }
   if (filters.capaciteMax) {
-    conditions.push({ capacityMin: { lte: filters.capaciteMax } });
+    conditions.push({
+      OR: [
+        { capacityMin: null },
+        { capacityMin: { lte: filters.capaciteMax } },
+      ],
+    });
   }
 
   if (filters.prixMin) {

@@ -1,5 +1,6 @@
 import type { RoomStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { RateValue } from "@/lib/rooms/rates";
 
 /**
  * Accès aux salles du portail propriétaire.
@@ -17,7 +18,8 @@ export interface OwnerRoomListItem {
   status: RoomStatus;
   photoUrl: string | null;
   categoryName: string;
-  capacityMin: number;
+  /** `null` quand la salle n'annonce pas de minimum. */
+  capacityMin: number | null;
   capacityMax: number;
   photoCount: number;
   /** Réservations en cours : une salle réservée ne doit pas être désactivée à la légère. */
@@ -109,7 +111,8 @@ export interface RoomFormValues {
   address: string;
   /** Libellés des catégories retenues ; le premier est la catégorie principale. */
   categoryNames: string[];
-  capacityMin: number;
+  /** `null` quand la salle n'annonce pas de minimum. */
+  capacityMin: number | null;
   capacityMax: number;
   basePrice: number;
   status: RoomStatus;
@@ -117,6 +120,8 @@ export interface RoomFormValues {
   equipments: { name: string; detail: string | null }[];
   /** Libellés des prestations retenues. */
   serviceNames: string[];
+  /** Grille tarifaire, dans l'ordre où le propriétaire l'a rangée. */
+  rates: RateValue[];
   photos: { id: string; url: string }[];
 }
 
@@ -158,6 +163,10 @@ export async function getOwnerRoomForEdit(
         orderBy: { equipment: { name: "asc" } },
       },
       services: { select: { service: { select: { name: true } } } },
+      rates: {
+        select: { label: true, detail: true, price: true, unit: true },
+        orderBy: { position: "asc" },
+      },
       photos: {
         select: { id: true, url: true },
         orderBy: { position: "asc" },
@@ -193,6 +202,14 @@ export async function getOwnerRoomForEdit(
         detail: link.detail,
       })),
       serviceNames: room.services.map((link) => link.service.name),
+      rates: room.rates.map((rate) => ({
+        label: rate.label,
+        detail: rate.detail,
+        // `Decimal` ne traverse pas la frontière serveur → client : le
+        // formulaire est un composant client.
+        price: Number(rate.price),
+        unit: rate.unit,
+      })),
       photos: room.photos,
     },
   };

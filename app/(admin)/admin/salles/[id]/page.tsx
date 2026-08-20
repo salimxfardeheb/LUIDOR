@@ -43,6 +43,7 @@ import {
   RoomStatusBadge,
 } from "@/components/owner/RoomStatusBadge";
 import { ChipGrid, servicePriceLabel } from "@/components/rooms/detail/ChipGrid";
+import { RateTable } from "@/components/rooms/detail/RateTable";
 import { Alert } from "@/components/ui/Alert";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
@@ -276,9 +277,24 @@ function Offer({ room }: { room: AdminRoomDetail }) {
             icon={Users}
             label="Capacité"
             value={formatCapacity(room.capacityMin, room.capacityMax)}
-            note={`de ${formatNumber(room.capacityMin)} à ${formatNumber(room.capacityMax)} invités`}
+            note={
+              room.capacityMin === null
+                ? `${formatNumber(room.capacityMax)} invités au maximum`
+                : `de ${formatNumber(room.capacityMin)} à ${formatNumber(room.capacityMax)} invités`
+            }
           />
         </div>
+
+        {/* Le tarif de base ne dit qu'un prix d'appel : c'est cette grille que
+            le client comparera, elle mérite d'être relue avant validation. */}
+        {room.rates.length > 0 && (
+          <div>
+            <SectionLabel>Grille tarifaire ({room.rates.length})</SectionLabel>
+            <div className="mt-2">
+              <RateTable rates={room.rates} />
+            </div>
+          </div>
+        )}
 
         <div>
           <SectionLabel>Catégories</SectionLabel>

@@ -6,9 +6,10 @@ import { FilterSelect } from "@/components/ui/FilterSelect";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Alert } from "@/components/ui/Alert";
 import { auth } from "@/lib/auth";
-import { getOwnerRoomMonth } from "@/lib/owner/availability";
+import { getOwnerRoomMonth, todayIso } from "@/lib/owner/availability";
 import {
   buildAvailabilityHref,
+  lastEditableDate,
   resolveMonthWindow,
 } from "@/lib/owner/availability-params";
 import { listOwnerRoomOptions } from "@/lib/owner/rooms";
@@ -38,7 +39,7 @@ export default async function Page({ searchParams }: PageProps) {
 
   if (rooms.length === 0) {
     return (
-      <div className="mx-auto flex max-w-5xl flex-col gap-6">
+      <div className="mx-auto flex max-w-4xl flex-col gap-6">
         <Header />
         <EmptyState
           icon={Building2}
@@ -63,7 +64,7 @@ export default async function Page({ searchParams }: PageProps) {
   );
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+    <div className="mx-auto flex max-w-4xl flex-col gap-6">
       <Header />
 
       <FilterSelect
@@ -87,6 +88,11 @@ export default async function Page({ searchParams }: PageProps) {
           roomId={selectedRoom.id}
           roomName={selectedRoom.name}
           month={month}
+          // Bornes de la fenêtre gérable calculées ici : le calendrier tourne
+          // dans le navigateur, mais ce n'est pas à l'horloge du visiteur de
+          // décider quelles dates sont modifiables.
+          today={todayIso()}
+          maxDate={lastEditableDate()}
           previousHref={
             monthWindow.previous
               ? buildAvailabilityHref(selectedRoom.id, monthWindow.previous.key)

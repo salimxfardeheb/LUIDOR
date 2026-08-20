@@ -117,7 +117,7 @@ Envoi d'une copie des messages du formulaire `/contact` à l'équipe. **Tant que
 
 ## Base de données
 
-Le schéma vit dans [`prisma/schema.prisma`](prisma/schema.prisma) — 19 modèles et 6 énumérations, tous commentés.
+Le schéma vit dans [`prisma/schema.prisma`](prisma/schema.prisma) — 24 modèles et 8 énumérations, tous commentés.
 
 ### Modèles principaux
 
@@ -126,6 +126,7 @@ Le schéma vit dans [`prisma/schema.prisma`](prisma/schema.prisma) — 19 modèl
 | `User` | Comptes des trois rôles. `passwordHash` est nullable (compte créé via un provider externe). `suspendedAt` bloque la connexion. |
 | `Room` | Salle. Cycle de vie `PENDING → ACTIVE / REJECTED`, plus `SUSPENDED` hors ligne. Seules les salles `ACTIVE` sont publiques. |
 | `RoomCategory` | Rattachement salle ↔ catégorie. Une salle peut servir plusieurs types d'événement. **Invariant :** la catégorie principale (`Room.categoryId`) figure toujours dans cette table. |
+| `RoomRate` | Grille tarifaire d'une salle : une ligne par formule (« Location soirée, 21h – 3h, 270 000 DA »). Facultative, propre à la salle — aucun référentiel partagé, contrairement à `Service`. `Room.basePrice` reste le prix d'appel du catalogue. |
 | `Booking` | Réservation. `EN_ATTENTE → EN_COURS_VERIFICATION → CONFIRMEE → CLOTUREE`, ou `ANNULEE`. |
 | `Payment` | Argent d'une réservation, en espèces et en deux temps : `status`/`paidAt` pour l'encaissement client → LIUDOR, `payout*` pour le reversement LIUDOR → propriétaire. `bookingId` unique : un second enregistrement corrige le montant. |
 | `Review` | Avis client. `publishedAt` nul = en attente de modération. Unique par couple (salle, client). |
@@ -136,7 +137,7 @@ Le schéma vit dans [`prisma/schema.prisma`](prisma/schema.prisma) — 19 modèl
 
 ### Migrations
 
-Onze migrations versionnées dans [`prisma/migrations/`](prisma/migrations/), de `20260803205007_init` à `20260820002923_payment_owner_payout`.
+Seize migrations versionnées dans [`prisma/migrations/`](prisma/migrations/), de `20260803205007_init` à `20260820170000_room_rates`.
 
 ```bash
 npm run db:migrate      # applique les migrations et régénère le client
@@ -167,7 +168,7 @@ Deux conséquences à connaître :
 
 ## Comptes de démonstration
 
-`npm run db:seed` crée un jeu de données complet : catégories, équipements, services, salles avec photos, disponibilités sur plusieurs mois, réservations, avis — et **sept comptes de démonstration**.
+`npm run db:seed` crée un jeu de données complet : catégories, équipements, services, salles avec photos et grilles tarifaires, disponibilités sur plusieurs mois, réservations, avis — et **sept comptes de démonstration**.
 
 | Rôle | Email | Nom |
 | --- | --- | --- |
@@ -334,6 +335,10 @@ Les helpers partagés sont dans [`lib/forms.ts`](lib/forms.ts) — `text()`, `se
 
 Les bornes de validation sont exportées (`ROOM_LIMITS`, `PROFILE_LIMITS`, `PHOTO_LIMITS`) et servent à la fois au schéma Zod et aux attributs HTML `min` / `max` / `maxLength` : le navigateur signale exactement les mêmes limites que le serveur, qui reste seul à faire autorité.
 
+Le formulaire salle se remplit en **trois étapes** — la salle, les tarifs, les photos et prestations ([`RoomFormSteps`](components/owner/RoomFormSteps.tsx)) — mais reste **un seul `<form>` et un seul envoi** : les étapes en retrait sont masquées, jamais démontées, sinon leurs champs quitteraient le `FormData`. Le découpage et la lecture de l'avancement vivent dans [`lib/owner/room-form.ts`](lib/owner/room-form.ts), qui relit le `FormData` du formulaire plutôt qu'un état React parallèle : les champs restent non contrôlés et la progression ne peut pas diverger de ce qui sera envoyé.
+
+Un refus du serveur affiche un **résumé d'erreurs** en tête : chaque erreur y est nommée, pointe vers son champ et ramène à l'étape correspondante ; le résumé prend le focus. Le formulaire porte `noValidate` — le navigateur ne sait pas signaler un champ qu'il n'affiche pas, il refuserait l'envoi en silence — et déclenche lui-même le contrôle natif, étape par étape.
+
 ### Commentaires
 
 La règle du projet : **expliquer le *pourquoi*, jamais le *quoi*.** Un commentaire qui paraphrase le code sera refusé en revue ; un commentaire qui documente un arbitrage, une contrainte externe ou un piège évité a toute sa place. Les fichiers existants en donnent la mesure.
@@ -392,7 +397,7 @@ Version `0.1.0` — **en développement, pas encore déployable en production.**
 
 ### Fonctionnel
 
-Catalogue public avec recherche, filtres et pagination · fiche salle détaillée (photos, équipements, services, avis, calendrier, carte) · blog · formulaire de contact · inscription et connexion · espace client (profil, avatar, favoris, historique, dépôt d'avis) · portail propriétaire (salles, photos, calendrier de disponibilités, réservations, tableau de bord) · administration (clients, propriétaires, validation des salles, réservations et leur détail, suivi des paiements en espèces, blog).
+Catalogue public avec recherche, filtres et pagination · fiche salle détaillée (photos, tarifs et formules, équipements, services, avis, calendrier, carte) · blog · formulaire de contact · inscription et connexion · espace client (profil, avatar, favoris, historique, dépôt d'avis) · portail propriétaire (salles, photos, calendrier de disponibilités, réservations, tableau de bord) · administration (clients, propriétaires, validation des salles, réservations et leur détail, suivi des paiements en espèces, blog).
 
 ### En cours ou absent
 

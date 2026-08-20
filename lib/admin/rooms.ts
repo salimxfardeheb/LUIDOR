@@ -1,5 +1,6 @@
 import type { ModerationAction, RoomStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import type { RateValue } from "@/lib/rooms/rates";
 
 /**
  * Lectures de la file de validation des salles.
@@ -34,7 +35,8 @@ export interface PendingRoom {
   district: string | null;
   address: string;
   categoryName: string;
-  capacityMin: number;
+  /** `null` quand la salle n'annonce pas de minimum. */
+  capacityMin: number | null;
   capacityMax: number;
   basePrice: number;
   /** Photos du dossier, dans l'ordre d'affichage. */
@@ -241,7 +243,8 @@ export interface AdminRoomDetail {
   categoryName: string;
   /** Toutes les catégories, principale en tête. */
   categoryNames: string[];
-  capacityMin: number;
+  /** `null` quand la salle n'annonce pas de minimum. */
+  capacityMin: number | null;
   capacityMax: number;
   basePrice: number;
   surfaceM2: number | null;
@@ -261,6 +264,8 @@ export interface AdminRoomDetail {
   /** Équipements et la précision saisie par le propriétaire pour cette salle. */
   equipments: { name: string; detail: string | null }[];
   services: { name: string; price: number }[];
+  /** Grille tarifaire du propriétaire, vide quand la salle n'en annonce pas. */
+  rates: (RateValue & { id: string })[];
   /** Horodatages ISO. */
   createdAt: string;
   updatedAt: string;
@@ -324,6 +329,10 @@ export async function getAdminRoomDetail(
       services: {
         select: { service: { select: { name: true, price: true } } },
         orderBy: { service: { name: "asc" } },
+      },
+      rates: {
+        select: { id: true, label: true, detail: true, price: true, unit: true },
+        orderBy: { position: "asc" },
       },
       _count: { select: { bookings: true, reviews: true, favorites: true } },
       owner: {
@@ -394,6 +403,13 @@ export async function getAdminRoomDetail(
     services: room.services.map((link) => ({
       name: link.service.name,
       price: Number(link.service.price),
+    })),
+    rates: room.rates.map((rate) => ({
+      id: rate.id,
+      label: rate.label,
+      detail: rate.detail,
+      price: Number(rate.price),
+      unit: rate.unit,
     })),
     createdAt: room.createdAt.toISOString(),
     updatedAt: room.updatedAt.toISOString(),

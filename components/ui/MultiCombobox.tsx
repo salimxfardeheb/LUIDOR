@@ -32,6 +32,7 @@ export function MultiCombobox({
   emptyLabel = "Aucun résultat.",
   createLabel = (query: string) => `Ajouter « ${query} »`,
   primaryLabel,
+  onValuesChange,
   className,
   "aria-describedby": describedBy,
   "aria-invalid": invalid,
@@ -48,6 +49,13 @@ export function MultiCombobox({
   createLabel?: (query: string) => string;
   /** Mention portée par la première puce (« principale », par exemple). */
   primaryLabel?: string;
+  /**
+   * Notifie le parent des valeurs retenues, sans rendre le champ contrôlé :
+   * ce sont toujours les champs cachés ci-dessous qui sont soumis. Sert aux
+   * champs qui dépendent de cette sélection — les formules tarifaires suggérées
+   * découlent des catégories de la salle.
+   */
+  onValuesChange?: (values: string[]) => void;
   className?: string;
   "aria-describedby"?: string;
   "aria-invalid"?: boolean;
@@ -176,6 +184,19 @@ export function MultiCombobox({
       ?.querySelector<HTMLElement>('[data-highlighted="true"]')
       ?.scrollIntoView({ block: "nearest" });
   }, [open, highlighted]);
+
+  /*
+   * La notification passe par une référence : sans elle, un parent qui redéfinit
+   * son gestionnaire à chaque rendu — le cas courant — relancerait l'effet en
+   * boucle alors que la sélection n'a pas bougé.
+   */
+  const notify = React.useRef(onValuesChange);
+  React.useEffect(() => {
+    notify.current = onValuesChange;
+  });
+  React.useEffect(() => {
+    notify.current?.(values);
+  }, [values]);
 
   const listboxId = `${id}-listbox`;
 

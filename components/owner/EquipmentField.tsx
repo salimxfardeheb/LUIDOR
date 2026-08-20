@@ -181,6 +181,9 @@ export function EquipmentField({
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
+          // Cible de l'ancre du résumé d'erreurs : la section n'a pas d'autre
+          // contrôle stable, les cases dépendant du référentiel affiché.
+          id="equipments"
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={(event) => {

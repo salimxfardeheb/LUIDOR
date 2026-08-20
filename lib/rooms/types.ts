@@ -10,7 +10,8 @@ export interface RoomSummary {
   name: string;
   city: string;
   categoryName: string;
-  capacityMin: number;
+  /** `null` quand la salle n'annonce pas de minimum. */
+  capacityMin: number | null;
   capacityMax: number;
   basePrice: number;
   /** Moyenne des avis, ou `null` si la salle n'a encore aucun avis. */

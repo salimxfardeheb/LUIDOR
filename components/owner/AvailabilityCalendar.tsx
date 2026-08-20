@@ -4,13 +4,15 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   CalendarRange,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Info,
   Loader2,
   Lock,
+  RotateCcw,
+  XCircle,
 } from "lucide-react";
 import {
   setDateRangeAvailability,
@@ -18,12 +20,12 @@ import {
   type SetRangeActionResult,
 } from "@/actions/owner-availability";
 import { Alert } from "@/components/ui/Alert";
+import { Button, buttonVariants } from "@/components/ui/Button";
 import { formatDate, formatMonthYear, formatNumber } from "@/lib/format";
 import {
   buildAvailabilityHref,
   dayState,
   isDayEditable,
-  lastEditableDate,
   leadingBlanks,
   WEEKDAY_INITIALS,
   type OwnerCalendarDay,
@@ -35,8 +37,12 @@ import { cn } from "@/lib/utils";
 /**
  * Apparence des quatre états, reprise du calendrier de la fiche salle : même
  * pastille de couleur, mêmes jetons de la charte (`success`, `error`,
- * `warning`, gris). La fiche affiche un mini calendrier, celui-ci occupe la
- * page : les cases portent en plus leur libellé sur grand écran.
+ * `warning`, gris).
+ *
+ * Les cases restent volontairement compactes — une case de calendrier se lit
+ * d'un coup d'œil, elle n'a pas à occuper la largeur de la page : la couleur
+ * et la pastille portent l'état, le libellé complet vit dans la légende et
+ * dans l'`aria-label` de chaque case.
  */
 const STATE_META: Record<
   OwnerDayState,
@@ -67,31 +73,47 @@ const STATE_META: Record<
 /** Ordre d'affichage de la légende. */
 const LEGEND_STATES: OwnerDayState[] = ["open", "closed", "booked"];
 
-/** Date du jour au format `YYYY-MM-DD`, en UTC (même convention que le serveur). */
-function todayIso(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
 /** Nombre de jours d'une période inclusive, ou `null` si le couple est invalide. */
 function daysInPeriod(from: string, to: string): number | null {
-  if (from > to) return null;
+  if (!from || !to || from > to) return null;
   const start = new Date(`${from}T00:00:00.000Z`);
   const end = new Date(`${to}T00:00:00.000Z`);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
   return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
 }
 
+/** Ramène une date ISO dans la fenêtre gérable. */
+function clampDate(value: string, min: string, max: string): string {
+  if (value < min) return min;
+  if (value > max) return max;
+  return value;
+}
+
+/** Accord au pluriel des résumés (« 3 dates ouvertes »). */
+function plural(count: number, word: string): string {
+  return `${formatNumber(count)} ${word}${count > 1 ? "s" : ""}`;
+}
+
 interface AvailabilityCalendarProps {
   roomId: string;
   roomName: string;
   month: OwnerCalendarMonth;
+  /**
+   * Aujourd'hui et dernière date gérable, calculés par la page.
+   *
+   * Ces deux bornes viennent du serveur plutôt que d'un `new Date()` au rendu :
+   * l'horloge du navigateur n'a pas à décider de ce qui est modifiable, et le
+   * HTML hydraté correspond exactement à celui rendu côté serveur.
+   */
+  today: string;
+  maxDate: string;
   /** `null` sur la première / dernière borne de la fenêtre gérable. */
   previousHref: string | null;
   nextHref: string | null;
 }
 
 /**
- * Calendrier mensuel d'une salle, pleine page.
+ * Calendrier mensuel d'une salle.
  *
  * Un clic alterne l'état d'une date (ouverte ↔ fermée). L'état affiché vient
  * de la réponse de l'action, jamais d'une supposition locale : si le serveur
@@ -105,14 +127,13 @@ interface AvailabilityCalendarProps {
  * La navigation entre les mois passe par des liens : le mois vit dans l'URL,
  * la page est donc partageable et rechargeable, et chaque mois est chargé à la
  * demande plutôt que préchargé sur douze mois.
- *
- * Le parent monte ce composant avec une `key` dépendant de la salle et du
- * mois : changer de vue repart de l'état serveur, sans effet de synchronisation.
  */
 export function AvailabilityCalendar({
   roomId,
   roomName,
   month,
+  today,
+  maxDate,
   previousHref,
   nextHref,
 }: AvailabilityCalendarProps) {
@@ -124,20 +145,29 @@ export function AvailabilityCalendar({
   const [error, setError] = React.useState<string | null>(null);
   const [announcement, setAnnouncement] = React.useState("");
 
-  const today = todayIso();
+  /*
+    Grille rendue par le serveur lors du dernier rendu pris en compte.
+    Après un refus, l'action déclenche `router.refresh()` : le serveur renvoie
+    une grille à jour, qu'il faut réellement afficher. Sans cette
+    resynchronisation, l'état local resterait celui du premier rendu et la
+    grille mentirait jusqu'au prochain changement de salle ou de mois.
+    Ajustement pendant le rendu (et non dans un effet) : React relance le
+    rendu immédiatement, sans affichage intermédiaire périmé.
+  */
+  const [serverDays, setServerDays] = React.useState(month.days);
+  if (serverDays !== month.days) {
+    setServerDays(month.days);
+    setDays(month.days);
+  }
+
   const minDate = today;
-  const maxDate = lastEditableDate();
+  const currentMonthKey = today.slice(0, 7);
+  const isCurrentMonth = month.key === currentMonthKey;
 
   const monthLabel = formatMonthYear(
     new Date(Date.UTC(month.year, month.month - 1, 1))
   );
   const blanks = leadingBlanks(month.year, month.month);
-
-  const now = new Date();
-  const currentMonthKey = `${now.getUTCFullYear()}-${String(
-    now.getUTCMonth() + 1
-  ).padStart(2, "0")}`;
-  const isCurrentMonth = month.key === currentMonthKey;
 
   const counts = React.useMemo(() => {
     const initial: Record<OwnerDayState, number> = {
@@ -152,18 +182,28 @@ export function AvailabilityCalendar({
     }, initial);
   }, [days]);
 
-  // Période du panneau « Du / Au », pré-remplie sur le mois affiché : le
-  // composant est monté avec une clé salle-mois, les valeurs repartent donc de
-  // zéro à chaque changement de vue.
-  const [rangeStart, setRangeStart] = React.useState(
-    `${month.year}-${String(month.month).padStart(2, "0")}-01`
+  // Bornes du mois affiché, ramenées dans la fenêtre gérable : sur le mois
+  // courant, la période part d'aujourd'hui et non du 1er, sinon le champ
+  // afficherait une date que son propre attribut `min` interdit.
+  const monthBounds = React.useMemo(() => {
+    const first = `${month.year}-${String(month.month).padStart(2, "0")}-01`;
+    const last = new Date(Date.UTC(month.year, month.month, 0))
+      .toISOString()
+      .slice(0, 10);
+    return {
+      start: clampDate(first, minDate, maxDate),
+      end: clampDate(last, minDate, maxDate),
+    };
+  }, [month.year, month.month, minDate, maxDate]);
+
+  const [rangeStart, setRangeStart] = React.useState(monthBounds.start);
+  const [rangeEnd, setRangeEnd] = React.useState(monthBounds.end);
+  /** Action de période en cours, pour n'animer que le bouton concerné. */
+  const [rangeBusy, setRangeBusy] = React.useState<"open" | "close" | null>(
+    null
   );
-  const [rangeEnd, setRangeEnd] = React.useState(
-    new Date(Date.UTC(month.year, month.month, 0)).toISOString().slice(0, 10)
-  );
-  const [rangeBusy, setRangeBusy] = React.useState(false);
   const [rangeFeedback, setRangeFeedback] = React.useState<{
-    tone: "success" | "error";
+    tone: "success" | "error" | "info";
     message: string;
   } | null>(null);
 
@@ -173,13 +213,21 @@ export function AvailabilityCalendar({
     const inMonth = days.filter(
       (day) => day.date >= rangeStart && day.date <= rangeEnd
     );
-    const openInMonth = inMonth.filter(
-      (day) => dayState(day) === "open"
-    ).length;
+    const openInMonth = inMonth.filter((day) => dayState(day) === "open").length;
     return { total, inMonth: inMonth.length, openInMonth };
   }, [days, rangeStart, rangeEnd]);
 
-  const rangeValid = rangeStats !== null;
+  // Une période invalide désactive les boutons : la raison est dite, plutôt
+  // que laissée à deviner devant deux boutons éteints.
+  const rangeError =
+    rangeStats !== null
+      ? null
+      : !rangeStart || !rangeEnd
+        ? "Renseignez les deux dates de la période."
+        : "La date « Du » doit précéder la date « Au ».";
+
+  const isDefaultRange =
+    rangeStart === monthBounds.start && rangeEnd === monthBounds.end;
 
   async function toggle(day: OwnerCalendarDay) {
     if (!isDayEditable(day) || pendingDates.has(day.date)) return;
@@ -217,28 +265,28 @@ export function AvailabilityCalendar({
   }
 
   async function applyRange(open: boolean) {
-    if (!rangeValid || rangeBusy) return;
+    if (rangeStats === null || rangeBusy) return;
 
     // Garde côté client avant d'appeler l'action : le serveur applique les
     // mêmes bornes, cette étape rend simplement le résumé fidèle à la période
     // réellement modifiée.
-    const from = rangeStart < minDate ? minDate : rangeStart;
-    const to = rangeEnd > maxDate ? maxDate : rangeEnd;
+    const from = clampDate(rangeStart, minDate, maxDate);
+    const to = clampDate(rangeEnd, minDate, maxDate);
 
     if (from > to) {
       setRangeFeedback({
         tone: "error",
-        message: "Cette période est entièrement passée.",
+        message: "Cette période est entièrement hors de la fenêtre gérable.",
       });
       return;
     }
 
-    setRangeBusy(true);
+    setRangeBusy(open ? "open" : "close");
     setRangeFeedback(null);
 
     const result = await setDateRangeAvailability(roomId, from, to, open);
 
-    setRangeBusy(false);
+    setRangeBusy(null);
 
     if (!result.ok) {
       setRangeFeedback({ tone: "error", message: result.message });
@@ -249,27 +297,39 @@ export function AvailabilityCalendar({
 
     reflectRangeResult(result);
 
-    setRangeFeedback({
-      tone: "success",
-      message: `Période appliquée : ${formatNumber(result.opened)} date${
-        result.opened > 1 ? "s" : ""
-      } ouverte${result.opened > 1 ? "s" : ""}, ${formatNumber(
-        result.closed
-      )} fermée${result.closed > 1 ? "s" : ""}, ${formatNumber(
-        result.skipped
-      )} ignorée${result.skipped > 1 ? "s" : ""}.`,
-    });
-    setAnnouncement(
-      `${formatNumber(result.opened)} date${result.opened > 1 ? "s" : ""} ouvertes, ${formatNumber(
-        result.closed
-      )} fermées, ${formatNumber(result.skipped)} ignorées.`
-    );
+    // `opened` et `closed` s'excluent : une seule action est demandée à la
+    // fois. Le résumé ne parle donc que du compteur concerné.
+    const applied = open ? result.opened : result.closed;
+    const verb = open ? "ouverte" : "fermée";
+
+    if (applied === 0) {
+      const message =
+        result.skipped === 0
+          ? "Aucun changement sur cette période."
+          : result.skipped === 1
+            ? `Aucun changement : cette date est déjà ${verb} ou verrouillée par une réservation.`
+            : `Aucun changement : ces ${plural(result.skipped, "date")} sont déjà ${verb}s ou verrouillées par une réservation.`;
+      setRangeFeedback({ tone: "info", message });
+      setAnnouncement(message);
+      router.refresh();
+      return;
+    }
+
+    const message =
+      result.skipped > 0
+        ? `${plural(applied, "date")} ${verb}${applied > 1 ? "s" : ""} · ${plural(result.skipped, "date")} laissée${result.skipped > 1 ? "s" : ""} intacte${result.skipped > 1 ? "s" : ""}.`
+        : `${plural(applied, "date")} ${verb}${applied > 1 ? "s" : ""}.`;
+
+    setRangeFeedback({ tone: "success", message });
+    setAnnouncement(message);
     router.refresh();
   }
 
   /** Repousse dans la grille affichée les dates de la période déjà visibles. */
   function reflectRangeResult(result: SetRangeActionResult & { ok: true }) {
-    const appliedByDate = new Map(result.dates.map((item) => [item.date, item.status]));
+    const appliedByDate = new Map(
+      result.dates.map((item) => [item.date, item.status])
+    );
     setDays((previous) =>
       previous.map((item) => {
         const status = appliedByDate.get(item.date);
@@ -281,132 +341,148 @@ export function AvailabilityCalendar({
   return (
     <section
       aria-labelledby="calendrier-titre"
-      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm sm:p-6"
+      className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
     >
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <header className="flex flex-col gap-3 border-b border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-5">
         <div className="min-w-0">
           <h2
             id="calendrier-titre"
-            className="truncate text-base font-semibold text-gray-900"
+            className="truncate text-sm font-semibold text-gray-900"
           >
             {roomName}
           </h2>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <StatPill
-              tone="success"
-              label={`${formatNumber(counts.open)} ouverte${counts.open > 1 ? "s" : ""}`}
-            />
-            <StatPill
-              tone="error"
-              label={`${formatNumber(counts.booked)} réservée${counts.booked > 1 ? "s" : ""}`}
-            />
-            <StatPill
-              tone="muted"
-              label={`${formatNumber(counts.closed)} fermée${counts.closed > 1 ? "s" : ""}`}
-            />
-          </div>
+          <p className="mt-0.5 text-xs text-gray-500">
+            Dates gérables jusqu&apos;au {formatDate(maxDate)}
+          </p>
         </div>
 
-        <div className="flex items-center justify-between gap-2 sm:justify-end">
+        <nav
+          aria-label="Navigation par mois"
+          className="flex items-center justify-between gap-1.5 sm:justify-end"
+        >
           <MonthNavButton direction="prev" href={previousHref} />
-          <div className="flex min-w-[9rem] flex-col items-center gap-0.5">
-            <p
-              aria-live="polite"
-              className="text-sm font-semibold capitalize text-gray-900"
-            >
-              {monthLabel}
-            </p>
-            {!isCurrentMonth && (
-              <Link
-                href={buildAvailabilityHref(roomId, currentMonthKey)}
-                scroll={false}
-                className="text-xs font-medium text-accent transition-colors hover:text-primary-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
-              >
-                Aujourd&apos;hui
-              </Link>
-            )}
-          </div>
-          <MonthNavButton direction="next" href={nextHref} />
-        </div>
-      </div>
-
-      <RangePanel
-        start={rangeStart}
-        end={rangeEnd}
-        minDate={minDate}
-        maxDate={maxDate}
-        busy={rangeBusy}
-        stats={rangeStats}
-        valid={rangeValid}
-        feedback={rangeFeedback}
-        onStartChange={(value) => {
-          setRangeStart(value);
-          setRangeFeedback(null);
-        }}
-        onEndChange={(value) => {
-          setRangeEnd(value);
-          setRangeFeedback(null);
-        }}
-        onApply={applyRange}
-      />
-
-      {error && (
-        <Alert variant="error" className="mt-4">
-          {error}
-        </Alert>
-      )}
-
-      <div className="mt-4 grid grid-cols-7 gap-1 sm:gap-2">
-        {WEEKDAY_INITIALS.map((weekday, index) => (
-          <span
-            key={index}
-            aria-hidden
-            className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-400"
+          <p
+            aria-live="polite"
+            className="min-w-[8rem] text-center text-sm font-semibold capitalize text-gray-900"
           >
-            {weekday}
-          </span>
-        ))}
+            {monthLabel}
+          </p>
+          <MonthNavButton direction="next" href={nextHref} />
+          {!isCurrentMonth && (
+            <Link
+              href={buildAvailabilityHref(roomId, currentMonthKey)}
+              scroll={false}
+              className="ml-1 hidden h-8 items-center rounded-md px-2 text-xs font-semibold text-accent transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 sm:inline-flex"
+            >
+              Aujourd&apos;hui
+            </Link>
+          )}
+        </nav>
+      </header>
 
-        {Array.from({ length: blanks }, (_, index) => (
-          <span key={`blank-${index}`} aria-hidden />
-        ))}
+      {/*
+        Deux colonnes à partir de `lg` : la grille garde une largeur de
+        calendrier — celle qu'on lit d'un coup d'œil — et la place restante
+        sert aux actions plutôt qu'à étirer les cases.
+      */}
+      <div className="lg:grid lg:grid-cols-[21rem_minmax(0,1fr)]">
+        <div className="border-b border-gray-200 p-4 sm:p-5 lg:border-b-0 lg:border-r">
+          <div className="mx-auto max-w-[19.5rem]">
+            <div className="grid grid-cols-7 gap-1">
+              {WEEKDAY_INITIALS.map((weekday, index) => (
+                <span
+                  key={index}
+                  aria-hidden
+                  className="pb-1 text-center text-[10px] font-semibold uppercase tracking-wider text-gray-400"
+                >
+                  {weekday}
+                </span>
+              ))}
 
-        {days.map((day) => (
-          <DayCell
-            key={day.date}
-            day={day}
-            today={today}
-            pending={pendingDates.has(day.date)}
-            onToggle={() => toggle(day)}
+              {Array.from({ length: blanks }, (_, index) => (
+                <span key={`blank-${index}`} aria-hidden />
+              ))}
+
+              {days.map((day) => (
+                <DayCell
+                  key={day.date}
+                  day={day}
+                  today={today}
+                  pending={pendingDates.has(day.date)}
+                  onToggle={() => toggle(day)}
+                />
+              ))}
+            </div>
+
+            <ul className="mt-4 flex flex-wrap gap-x-3 gap-y-1.5 border-t border-gray-100 pt-3 text-[11px] text-gray-500">
+              {LEGEND_STATES.map((state) => (
+                <li key={state} className="flex items-center gap-1.5">
+                  <span
+                    aria-hidden
+                    className={cn("h-2 w-2 rounded-full", STATE_META[state].dot)}
+                  />
+                  {STATE_META[state].label}
+                </li>
+              ))}
+              <li className="flex items-center gap-1.5">
+                <span aria-hidden className="h-2 w-2 rounded-full bg-warning" />
+                Demande en attente
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4 p-4 sm:p-5">
+          <dl className="grid grid-cols-3 gap-2">
+            <CountCard tone="success" label="Ouvertes" value={counts.open} />
+            <CountCard tone="error" label="Réservées" value={counts.booked} />
+            <CountCard tone="muted" label="Fermées" value={counts.closed} />
+          </dl>
+
+          {error && (
+            <Alert variant="error" title="Modification refusée">
+              {error}
+            </Alert>
+          )}
+
+          <RangePanel
+            start={rangeStart}
+            end={rangeEnd}
+            minDate={minDate}
+            maxDate={maxDate}
+            busy={rangeBusy}
+            stats={rangeStats}
+            rangeError={rangeError}
+            feedback={rangeFeedback}
+            canReset={!isDefaultRange}
+            monthLabel={monthLabel}
+            onStartChange={(value) => {
+              setRangeStart(value);
+              setRangeFeedback(null);
+            }}
+            onEndChange={(value) => {
+              setRangeEnd(value);
+              setRangeFeedback(null);
+            }}
+            onReset={() => {
+              setRangeStart(monthBounds.start);
+              setRangeEnd(monthBounds.end);
+              setRangeFeedback(null);
+            }}
+            onApply={applyRange}
           />
-        ))}
+
+          <p className="mt-auto flex items-start gap-1.5 text-xs text-gray-400">
+            <Lock aria-hidden className="mt-0.5 h-3 w-3 shrink-0" />
+            Une date réservée est verrouillée : seul le support LIUDOR peut la
+            libérer.
+          </p>
+        </div>
       </div>
 
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
-
-      <div className="mt-5 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-        <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-gray-500">
-          {LEGEND_STATES.map((state) => (
-            <li key={state} className="flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className={cn("h-2 w-2 rounded-full", STATE_META[state].dot)}
-              />
-              {STATE_META[state].label}
-            </li>
-          ))}
-          <li className="flex items-center gap-1.5">
-            <span aria-hidden className="h-2 w-2 rounded-full bg-warning" />
-            Demande en attente
-          </li>
-        </ul>
-        <p className="text-xs text-gray-400">
-          Une date réservée est verrouillée : seul le support LIUDOR peut la
-          libérer.
-        </p>
-      </div>
     </section>
   );
 }
@@ -422,135 +498,171 @@ function RangePanel({
   maxDate,
   busy,
   stats,
-  valid,
+  rangeError,
   feedback,
+  canReset,
+  monthLabel,
   onStartChange,
   onEndChange,
+  onReset,
   onApply,
 }: {
   start: string;
   end: string;
   minDate: string;
   maxDate: string;
-  busy: boolean;
+  busy: "open" | "close" | null;
   stats: { total: number; inMonth: number; openInMonth: number } | null;
-  valid: boolean;
-  feedback: { tone: "success" | "error"; message: string } | null;
+  rangeError: string | null;
+  feedback: { tone: "success" | "error" | "info"; message: string } | null;
+  canReset: boolean;
+  monthLabel: string;
   onStartChange: (value: string) => void;
   onEndChange: (value: string) => void;
+  onReset: () => void;
   onApply: (open: boolean) => void;
 }) {
-  const applyDisabled = !valid || busy;
+  const applyDisabled = stats === null || busy !== null;
 
   return (
-    <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:p-5">
-      <div className="flex items-start gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white text-accent ring-1 ring-gray-200">
-          <CalendarRange aria-hidden className="h-4 w-4" />
-        </span>
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-gray-900">
-            Ouvrir ou fermer une période
-          </h3>
-          <p className="text-xs text-gray-500">
-            Les dates passées ou déjà réservées sont laissées intactes.
-          </p>
+    <section
+      aria-labelledby="periode-titre"
+      className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white text-accent ring-1 ring-gray-200">
+            <CalendarRange aria-hidden className="h-4 w-4" />
+          </span>
+          <div className="min-w-0">
+            <h3
+              id="periode-titre"
+              className="text-sm font-semibold text-gray-900"
+            >
+              Ouvrir ou fermer une période
+            </h3>
+            <p className="text-xs text-gray-500">
+              Les dates passées ou déjà réservées restent intactes.
+            </p>
+          </div>
         </div>
+
+        {canReset && (
+          <button
+            type="button"
+            onClick={onReset}
+            title="Revenir aux bornes du mois affiché"
+            aria-label={`Revenir aux bornes de ${monthLabel}`}
+            className="inline-flex shrink-0 items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-500 transition-colors hover:bg-white hover:text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
+          >
+            <RotateCcw aria-hidden className="h-3 w-3" />
+            <span className="capitalize">{monthLabel}</span>
+          </button>
+        )}
       </div>
 
-      <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-2">
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <RangeDateField
           id="du"
           label="Du"
           value={start}
           min={minDate}
           max={maxDate}
-          busy={busy}
+          busy={busy !== null}
+          invalid={rangeError !== null}
           onChange={onStartChange}
         />
-        <span
-          aria-hidden
-          className="hidden pb-3 text-gray-400 sm:flex sm:items-center"
-        >
-          <ArrowRight className="h-4 w-4" />
-        </span>
         <RangeDateField
           id="au"
           label="Au"
           value={end}
           min={minDate}
           max={maxDate}
-          busy={busy}
+          busy={busy !== null}
+          invalid={rangeError !== null}
           onChange={onEndChange}
         />
-
-        <div className="flex flex-1 flex-col gap-1.5 sm:flex-none">
-          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-            Action
-          </span>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => onApply(true)}
-              disabled={applyDisabled}
-              className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md bg-secondary px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-secondary-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
-            >
-              {busy ? (
-                <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle2 aria-hidden className="h-4 w-4" />
-              )}
-              Ouvrir
-            </button>
-            <button
-              type="button"
-              onClick={() => onApply(false)}
-              disabled={applyDisabled}
-              className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-300 bg-white px-4 text-sm font-semibold text-gray-700 shadow-xs transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
-            >
-              {busy ? (
-                <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-              ) : (
-                <Lock aria-hidden className="h-3.5 w-3.5" />
-              )}
-              Fermer
-            </button>
-          </div>
-        </div>
       </div>
 
-      {stats && (
-        <p className="mt-2.5 text-xs text-gray-500">
-          {formatNumber(stats.total)} jour{stats.total > 1 ? "s" : ""} dans la
-          période
-          {stats.inMonth > 0 &&
-            ` · ${formatNumber(stats.inMonth)} dans ce mois, dont ${formatNumber(
-              stats.openInMonth
-            )} actuellement ouverte${stats.openInMonth > 1 ? "s" : ""}`}
+      {rangeError ? (
+        <p id="periode-erreur" role="alert" className="mt-2 text-xs text-error">
+          {rangeError}
         </p>
+      ) : (
+        stats && (
+          <p className="mt-2 text-xs text-gray-500">
+            {plural(stats.total, "jour")} dans la période
+            {stats.inMonth > 0 &&
+              ` · ${formatNumber(stats.inMonth)} sur ce mois, dont ${formatNumber(
+                stats.openInMonth
+              )} déjà ouverte${stats.openInMonth > 1 ? "s" : ""}`}
+          </p>
+        )
       )}
 
-      {feedback && (
-        <div
-          role="status"
-          className={cn(
-            "mt-2.5 flex items-start gap-2 rounded-md border p-3 text-sm",
-            feedback.tone === "success"
-              ? "border-success/30 bg-success/5 text-gray-700"
-              : "border-error/30 bg-error/5 text-gray-700"
-          )}
+      {/* Boutons de la charte : or plein pour l'action qui publie des dates,
+          contour pour celle qui les retire. */}
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button
+          type="button"
+          variant="primary"
+          onClick={() => onApply(true)}
+          disabled={applyDisabled}
+          className="font-semibold"
         >
-          {feedback.tone === "success" ? (
-            <CheckCircle2
-              aria-hidden
-              className="mt-0.5 h-4 w-4 shrink-0 text-success"
-            />
+          {busy === "open" ? (
+            <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
           ) : (
-            <Lock aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-error" />
+            <CheckCircle2 aria-hidden className="h-4 w-4" />
           )}
-          <span>{feedback.message}</span>
-        </div>
+          Ouvrir
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => onApply(false)}
+          disabled={applyDisabled}
+          className="bg-white font-semibold text-gray-700"
+        >
+          {busy === "close" ? (
+            <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+          ) : (
+            <Lock aria-hidden className="h-3.5 w-3.5" />
+          )}
+          Fermer
+        </Button>
+      </div>
+
+      {feedback && <RangeFeedback {...feedback} />}
+    </section>
+  );
+}
+
+/** Retour de l'action de période : ce qui a réellement été appliqué. */
+function RangeFeedback({
+  tone,
+  message,
+}: {
+  tone: "success" | "error" | "info";
+  message: string;
+}) {
+  const meta = {
+    success: { icon: CheckCircle2, box: "border-success/30 bg-success/5", icon_: "text-success" },
+    error: { icon: XCircle, box: "border-error/30 bg-error/5", icon_: "text-error" },
+    info: { icon: Info, box: "border-gray-200 bg-white", icon_: "text-gray-400" },
+  }[tone];
+  const Icon = meta.icon;
+
+  return (
+    <div
+      role="status"
+      className={cn(
+        "mt-3 flex items-start gap-2 rounded-md border p-3 text-xs text-gray-700",
+        meta.box
       )}
+    >
+      <Icon aria-hidden className={cn("mt-px h-4 w-4 shrink-0", meta.icon_)} />
+      <span>{message}</span>
     </div>
   );
 }
@@ -562,6 +674,7 @@ function RangeDateField({
   min,
   max,
   busy,
+  invalid,
   onChange,
 }: {
   id: string;
@@ -570,10 +683,11 @@ function RangeDateField({
   min: string;
   max: string;
   busy: boolean;
+  invalid: boolean;
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:flex-none">
+    <div className="flex min-w-0 flex-col gap-1.5">
       <label
         htmlFor={id}
         className="text-xs font-semibold uppercase tracking-wide text-gray-500"
@@ -587,20 +701,29 @@ function RangeDateField({
         min={min}
         max={max}
         disabled={busy}
+        aria-invalid={invalid || undefined}
+        aria-describedby={invalid ? "periode-erreur" : undefined}
         onChange={(event) => onChange(event.target.value)}
-        className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 shadow-xs transition-colors focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50 sm:w-44"
+        className={cn(
+          "h-10 w-full rounded-md border bg-white px-3 text-sm text-gray-900 shadow-xs transition-colors",
+          "focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40",
+          "disabled:cursor-not-allowed disabled:opacity-50",
+          invalid ? "border-error/60" : "border-gray-300"
+        )}
       />
     </div>
   );
 }
 
-/** Pastille de comptage de l'en-tête, par état. */
-function StatPill({
+/** Compteur d'un état sur le mois affiché. */
+function CountCard({
   tone,
   label,
+  value,
 }: {
   tone: "success" | "error" | "muted";
   label: string;
+  value: number;
 }) {
   const classes = {
     success: "border-success/30 bg-success/5 text-success",
@@ -609,14 +732,14 @@ function StatPill({
   }[tone];
 
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium",
-        classes
-      )}
-    >
-      {label}
-    </span>
+    <div className={cn("rounded-md border px-3 py-2", classes)}>
+      <dt className="text-[11px] font-medium uppercase tracking-wide opacity-80">
+        {label}
+      </dt>
+      <dd className="text-lg font-semibold leading-tight">
+        {formatNumber(value)}
+      </dd>
+    </div>
   );
 }
 
@@ -640,7 +763,7 @@ function DayCell({
   const description = [
     formatDate(day.date),
     isToday ? "aujourd'hui" : null,
-    `${meta.label.toLowerCase()}`,
+    meta.label.toLowerCase(),
     day.requested ? "demande de réservation en attente" : null,
     editable
       ? state === "open"
@@ -656,42 +779,42 @@ function DayCell({
       type="button"
       disabled={!editable || pending}
       onClick={onToggle}
+      // État de bascule pour les technologies d'assistance : une date ouverte
+      // est un interrupteur enfoncé. Les dates verrouillées n'en sont pas un.
+      aria-pressed={editable ? state === "open" : undefined}
+      aria-busy={pending || undefined}
       aria-label={description}
       title={description}
       className={cn(
-        "flex aspect-square flex-col items-center justify-center gap-1 rounded-md border p-1",
-        "text-sm transition-colors focus-visible:outline-none focus-visible:ring-2",
-        "focus-visible:ring-accent/60 focus-visible:ring-offset-1 sm:gap-1.5",
+        "flex aspect-square flex-col items-center justify-center gap-0.5 rounded-md border",
+        "text-xs transition-colors focus-visible:outline-none focus-visible:ring-2",
+        "focus-visible:ring-accent/60 focus-visible:ring-offset-1",
         meta.cell,
         editable ? "cursor-pointer" : "cursor-not-allowed",
-        pending && "opacity-60",
         // Une demande en instruction reste modifiable : elle est signalée, pas
         // verrouillée. Seule une réservation confirmée l'est.
         day.requested && "ring-1 ring-inset ring-warning/50",
         isToday && "ring-2 ring-accent/70 ring-offset-1"
       )}
     >
-      <span className="flex items-center gap-1 font-medium leading-none">
+      <span className="flex items-center gap-0.5 font-medium leading-none">
         {dayNumber}
         {state === "booked" && (
-          <Lock aria-hidden className="h-3 w-3 text-gray-400" />
+          <Lock aria-hidden className="h-2.5 w-2.5 text-gray-400" />
         )}
       </span>
 
-      <span
-        aria-hidden
-        className={cn(
-          "h-1.5 w-1.5 rounded-full",
-          day.requested && editable ? "bg-warning" : meta.dot
-        )}
-      />
-
-      <span
-        aria-hidden
-        className="hidden text-[11px] leading-none text-current opacity-70 lg:block"
-      >
-        {state === "past" ? "" : meta.label}
-      </span>
+      {pending ? (
+        <Loader2 aria-hidden className="h-2.5 w-2.5 animate-spin text-gray-500" />
+      ) : (
+        <span
+          aria-hidden
+          className={cn(
+            "h-1.5 w-1.5 rounded-full",
+            day.requested && editable ? "bg-warning" : meta.dot
+          )}
+        />
+      )}
     </button>
   );
 }
@@ -707,8 +830,11 @@ function MonthNavButton({
   const isPrev = direction === "prev";
   const Icon = isPrev ? ChevronLeft : ChevronRight;
   const label = isPrev ? "Mois précédent" : "Mois suivant";
-  const className =
-    "inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 text-gray-600 shadow-xs transition-colors hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60";
+  // Même bouton que partout ailleurs sur le site, ramené au carré d'une icône.
+  const className = cn(
+    buttonVariants({ variant: "outline", size: "sm" }),
+    "h-8 w-8 shrink-0 px-0 text-gray-600"
+  );
 
   if (!href) {
     return (

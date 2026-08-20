@@ -128,6 +128,24 @@ async function resolveServiceIds(
   return ids;
 }
 
+/**
+ * Lignes de la grille tarifaire, prêtes pour un `create` imbriqué.
+ *
+ * Rien à résoudre ici, contrairement aux catégories ou aux prestations : une
+ * formule et son tarif n'appartiennent qu'à la salle qui les annonce, il n'y a
+ * pas de référentiel partagé à alimenter. Seul l'ordre est fixé — celui de la
+ * saisie devient `position`.
+ */
+function rateRows(rates: RoomInput["rates"]) {
+  return rates.map((rate, index) => ({
+    label: rate.label,
+    detail: rate.detail,
+    price: rate.price,
+    unit: rate.unit,
+    position: index,
+  }));
+}
+
 export type RoomActionResult =
   | { ok: true; roomId: string; message: string }
   | {
@@ -267,6 +285,9 @@ async function create(formData: FormData): Promise<RoomActionResult> {
           services: {
             create: serviceIds.map((serviceId) => ({ serviceId })),
           },
+          rates: {
+            create: rateRows(data.rates),
+          },
         },
         select: { id: true },
       });
@@ -373,6 +394,9 @@ async function update(formData: FormData): Promise<RoomActionResult> {
       await tx.roomCategory.deleteMany({ where: { roomId } });
       await tx.roomEquipment.deleteMany({ where: { roomId } });
       await tx.roomService.deleteMany({ where: { roomId } });
+      // La grille est réécrite en entier : les lignes n'ont pas d'identité
+      // stable côté formulaire, seul leur ordre en a une.
+      await tx.roomRate.deleteMany({ where: { roomId } });
 
       await tx.room.update({
         where: { id: roomId },
@@ -393,6 +417,9 @@ async function update(formData: FormData): Promise<RoomActionResult> {
           },
           services: {
             create: serviceIds.map((serviceId) => ({ serviceId })),
+          },
+          rates: {
+            create: rateRows(data.rates),
           },
         },
       });

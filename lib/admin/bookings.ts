@@ -295,7 +295,8 @@ export interface AdminBookingDetail {
     district: string | null;
     address: string;
     categoryName: string;
-    capacityMin: number;
+    /** `null` quand la salle n'annonce pas de minimum. */
+    capacityMin: number | null;
     capacityMax: number;
     basePrice: number;
     cleaningFee: number | null;

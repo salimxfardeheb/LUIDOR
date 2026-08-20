@@ -131,7 +131,8 @@ export async function checkRoomAvailability(
         field: "invites",
       };
     }
-    if (invites < room.capacityMin) {
+    // `null` = la salle n'annonce aucun minimum, rien à opposer au client.
+    if (room.capacityMin !== null && invites < room.capacityMin) {
       return {
         ok: false,
         message: `Cette salle se loue à partir de ${room.capacityMin} invités.`,

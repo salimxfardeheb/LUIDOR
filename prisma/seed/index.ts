@@ -1,4 +1,4 @@
-import { PrismaClient, type Prisma } from "@prisma/client";
+import { PrismaClient, type Prisma, type RateUnit } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -139,7 +139,13 @@ interface RoomSeed {
   district: string;
   address: string;
   category: string;
-  capacityMin: number;
+  /**
+   * Capacité minimum, facultative comme dans le formulaire : une salle qui
+   * n'en annonce pas s'affiche « Jusqu'à N invités » et ne disparaît d'aucune
+   * recherche. Deux salles du jeu de données en sont dépourvues, pour que ce
+   * cas soit visible sans le provoquer à la main.
+   */
+  capacityMin?: number;
   capacityMax: number;
   basePrice: number;
   surfaceM2: number;
@@ -155,7 +161,27 @@ interface RoomSeed {
   equipments: string[];
   /** Services optionnels, à choisir dans `SERVICES`. */
   services: string[];
+  /**
+   * Grille tarifaire détaillée, quand la salle se loue au créneau plutôt qu'à
+   * un prix unique. Absente pour la plupart des salles : la fiche masque alors
+   * la section, ce que le seed doit aussi savoir montrer.
+   */
+  rates?: {
+    label: string;
+    detail?: string;
+    price: number;
+    /** `FORFAIT` par défaut : le créneau, quel que soit l'effectif. */
+    unit?: RateUnit;
+  }[];
   practical?: Partial<Practical>;
+}
+
+/**
+ * Effectif d'une réservation de démonstration : le minimum annoncé par la
+ * salle, ou la moitié de sa capacité pour celles qui n'en annoncent pas.
+ */
+function demoGuests(room: RoomSeed): number {
+  return room.capacityMin ?? Math.round(room.capacityMax / 2);
 }
 
 const ROOMS: RoomSeed[] = [
@@ -190,6 +216,26 @@ const ROOMS: RoomSeed[] = [
       "Photographe",
       "Voiturier",
     ],
+    rates: [
+      {
+        label: "Location déjeuner",
+        detail: "Petite et grande salle",
+        price: 350000,
+      },
+      { label: "Location après-midi", detail: "14h – 19h", price: 200000 },
+      {
+        label: "Dîner et demi-soirée",
+        detail: "17h – minuit, les 2 salles",
+        price: 400000,
+      },
+      { label: "Location soirée", detail: "21h – 3h", price: 270000 },
+      {
+        label: "Dîner par couvert",
+        detail: "18h – 22h",
+        price: 3500,
+        unit: "COUVERT",
+      },
+    ],
     practical: { depositAmount: 80000, cleaningFee: 25000 },
   },
   {
@@ -216,6 +262,16 @@ const ROOMS: RoomSeed[] = [
       "Espace enfants",
     ],
     services: ["Traiteur", "Décoration florale", "Pâtisserie & gâteau"],
+    rates: [
+      { label: "Location après-midi", detail: "14h – 19h", price: 160000 },
+      { label: "Location soirée", detail: "21h – 3h", price: 240000 },
+      {
+        label: "Dîner par couvert",
+        detail: "18h – 22h",
+        price: 2800,
+        unit: "COUVERT",
+      },
+    ],
     practical: { petsAllowed: true },
   },
   {
@@ -290,7 +346,6 @@ const ROOMS: RoomSeed[] = [
     district: "Ali Mendjeli",
     address: "Nouvelle ville Ali Mendjeli, UV 15",
     category: "Séminaire",
-    capacityMin: 100,
     capacityMax: 800,
     basePrice: 410000,
     surfaceM2: 1400,
@@ -309,6 +364,22 @@ const ROOMS: RoomSeed[] = [
       "Accès PMR",
     ],
     services: ["Traiteur", "Service de sécurité", "Navette invités"],
+    rates: [
+      { label: "Demi-journée", detail: "8h – 13h", price: 120000 },
+      { label: "Journée complète", detail: "8h – 18h", price: 190000 },
+      {
+        label: "Pause-café",
+        detail: "Accueil et collation",
+        price: 900,
+        unit: "PERSONNE",
+      },
+      {
+        label: "Déjeuner d'affaires",
+        detail: "12h – 14h",
+        price: 2600,
+        unit: "PERSONNE",
+      },
+    ],
     practical: {
       openingHours: "07:00 – 23:00",
       musicPolicy: "Sonorisation limitée aux plages de conférence",
@@ -389,7 +460,6 @@ const ROOMS: RoomSeed[] = [
     district: "Centre-ville",
     address: "Rue Bouzered Hocine, Annaba",
     category: "Conférence",
-    capacityMin: 30,
     capacityMax: 120,
     basePrice: 85000,
     surfaceM2: 180,
@@ -520,7 +590,7 @@ async function main() {
       address: room.address,
       latitude: coords?.latitude ?? null,
       longitude: coords?.longitude ?? null,
-      capacityMin: room.capacityMin,
+      capacityMin: room.capacityMin ?? null,
       capacityMax: room.capacityMax,
       basePrice: room.basePrice,
       surfaceM2: room.surfaceM2,
@@ -556,6 +626,16 @@ async function main() {
           if (!serviceId) throw new Error(`Service inconnu : ${name}`);
           return { service: { connect: { id: serviceId } } };
         }),
+      },
+      // L'ordre du tableau est celui de la grille affichée sur la fiche.
+      rates: {
+        create: (room.rates ?? []).map((rate, position) => ({
+          label: rate.label,
+          detail: rate.detail ?? null,
+          price: rate.price,
+          unit: rate.unit ?? "FORFAIT",
+          position,
+        })),
       },
     };
 
@@ -609,7 +689,7 @@ async function main() {
           roomId: created.id,
           eventType: room.category,
           eventDate: addDays(startDate, 12 + index),
-          guestsCount: room.capacityMin,
+          guestsCount: demoGuests(room),
           contactPhone: "0555 00 00 0" + index,
           contactEmail: clients[index % clients.length].email,
           status: "CONFIRMEE",
@@ -621,7 +701,7 @@ async function main() {
           roomId: created.id,
           eventType: room.category,
           eventDate: addDays(startDate, 20 + index),
-          guestsCount: room.capacityMin,
+          guestsCount: demoGuests(room),
           contactPhone: "0555 11 11 1" + index,
           contactEmail: clients[(index + 1) % clients.length].email,
           status: "EN_COURS_VERIFICATION",

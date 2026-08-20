@@ -72,8 +72,14 @@ export function formatInitials(fullName: string): string {
     .join("");
 }
 
-/** Fourchette de capacité : « 150 – 400 invités ». */
-export function formatCapacity(min: number, max: number): string {
+/**
+ * Capacité d'une salle : « 150 – 400 invités », ou « Jusqu'à 400 invités »
+ * quand elle n'annonce pas de minimum — le cas le plus courant, une salle
+ * n'imposant en général qu'un plafond.
+ */
+export function formatCapacity(min: number | null, max: number): string {
+  if (min === null) return `Jusqu'à ${formatNumber(max)} invités`;
+
   return min === max
     ? `${formatNumber(max)} invités`
     : `${formatNumber(min)} – ${formatNumber(max)} invités`;

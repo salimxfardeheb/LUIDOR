@@ -186,7 +186,14 @@ model Room {
   address     String
   latitude    Float?
   longitude   Float?
-  capacityMin Int
+  /// Nombre d'invités en dessous duquel la salle ne se loue pas.
+  ///
+  /// Facultatif : beaucoup de salles n'annoncent qu'une capacité maximale, et
+  /// écrire « 1 » pour dire « pas de minimum » reviendrait à afficher une
+  /// fourchette que le propriétaire n'a jamais donnée. `null` signifie donc
+  /// « aucun minimum » — les filtres du catalogue et le contrôle d'une demande
+  /// de réservation le lisent ainsi.
+  capacityMin Int?
   capacityMax Int
   basePrice   Decimal    @db.Decimal(10, 2)
   status      RoomStatus @default(PENDING)
@@ -236,6 +243,8 @@ model Room {
   reviews        Review[]
   equipments     RoomEquipment[]
   services       RoomService[]
+  /// Grille tarifaire détaillée : formules et créneaux, au-delà du prix d'appel.
+  rates          RoomRate[]
   favorites      Favorite[]
   /// Décisions de validation et de rejet prises par l'équipe LIUDOR.
   moderations    RoomModeration[]
@@ -370,6 +379,53 @@ model RoomService {
 
   @@id([roomId, serviceId])
   @@map("room_services")
+}
+
+/// Unité d'un tarif : ce que le montant achète.
+///
+/// `FORFAIT` couvre la location d'un créneau, quel que soit le nombre
+/// d'invités ; `COUVERT` est le prix par assiette servie, l'usage courant pour
+/// un dîner ; `PERSONNE` sert aux formules sans repas (pause-café, séminaire) ;
+/// `HEURE` aux locations courtes.
+enum RateUnit {
+  FORFAIT
+  COUVERT
+  PERSONNE
+  HEURE
+}
+
+/// Ligne de la grille tarifaire d'une salle : « Location soirée (21h – 3h),
+/// 270 000 DA ».
+///
+/// `Room.basePrice` ne dit qu'un prix d'appel — c'est lui qui alimente les
+/// cartes, les filtres et le tri du catalogue. Une salle des fêtes se loue en
+/// réalité par créneau et par formule, à des tarifs qui n'ont pas de rapport
+/// entre eux : le client qui compare deux salles a besoin de cette grille, pas
+/// d'un prix unique. D'où une table à part plutôt que des colonnes sur `Room` —
+/// le nombre de formules varie d'une salle à l'autre, et beaucoup n'en ont
+/// aucune.
+///
+/// Rien n'est partagé avec les autres salles, contrairement à `Service` : un
+/// libellé et un tarif ne valent que pour la salle qui les a saisis. Le
+/// formulaire propose bien des formules types (`lib/rooms/rates.ts`), mais elles
+/// ne servent qu'à préremplir la saisie.
+model RoomRate {
+  id       String   @id @default(cuid())
+  roomId   String
+  /// Intitulé de la formule, ex. « Dîner et demi-soirée ».
+  label    String
+  /// Créneau ou précision affichée sous le libellé, ex. « 17h – minuit » ou
+  /// « pour les 2 salles ». Null quand la formule se suffit à elle-même.
+  detail   String?
+  price    Decimal  @db.Decimal(10, 2)
+  unit     RateUnit @default(FORFAIT)
+  /// Ordre d'affichage, tel que le propriétaire a rangé ses formules.
+  position Int      @default(0)
+
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@index([roomId])
+  @@map("room_rates")
 }
 
 model Booking {

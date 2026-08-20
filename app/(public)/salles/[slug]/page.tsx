@@ -11,6 +11,7 @@ import {
 import { LocationCard } from "@/components/rooms/detail/LocationCard";
 import { OwnerCard } from "@/components/rooms/detail/OwnerCard";
 import { PracticalInfo } from "@/components/rooms/detail/PracticalInfo";
+import { RateTable } from "@/components/rooms/detail/RateTable";
 import { RoomBreadcrumb } from "@/components/rooms/detail/RoomBreadcrumb";
 import { RoomDescription } from "@/components/rooms/detail/RoomDescription";
 import { RoomGallery } from "@/components/rooms/detail/RoomGallery";
@@ -109,6 +110,20 @@ export default async function Page({ params }: PageProps) {
           <Section title="À propos de cette salle">
             <RoomDescription description={room.description} />
           </Section>
+
+          {/* Grille tarifaire avant les équipements : c'est la question qui
+              vient juste après « à quoi ressemble la salle ». Absente tant que
+              le propriétaire n'a saisi aucune formule. */}
+          {room.rates.length > 0 && (
+            <Section title="Tarifs et formules">
+              <RateTable rates={room.rates} />
+              <p className="mt-3 text-xs text-gray-500">
+                Tarifs communiqués par le propriétaire, hors services
+                optionnels. Le montant exact vous est confirmé à la validation
+                de votre demande.
+              </p>
+            </Section>
+          )}
 
           {room.equipments.length > 0 && (
             <Section title="Équipements">

@@ -45,7 +45,8 @@ export function BookingRequestModal({
   onSent: (eventDate: string) => void;
   roomId: string;
   roomName: string;
-  capacityMin: number;
+  /** `null` quand la salle n'annonce pas de minimum. */
+  capacityMin: number | null;
   capacityMax: number;
   eventTypes: string[];
   defaults: BookingRequestDefaults;
@@ -199,7 +200,11 @@ export function BookingRequestModal({
             <FormField
               id="resa-guestsCount"
               label="Nombre d'invités"
-              hint={`${capacityMin} à ${capacityMax}`}
+              hint={
+                capacityMin === null
+                  ? `${capacityMax} au maximum`
+                  : `${capacityMin} à ${capacityMax}`
+              }
               required
               error={fieldErrors.guestsCount}
             >
@@ -208,7 +213,7 @@ export function BookingRequestModal({
                 name="guestsCount"
                 type="number"
                 inputMode="numeric"
-                min={capacityMin}
+                min={capacityMin ?? 1}
                 max={capacityMax}
                 step={1}
                 defaultValue={defaults.guestsCount}
