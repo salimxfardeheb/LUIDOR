@@ -14,6 +14,7 @@ import {
   PAYMENT_FILTER_LABELS,
   SORT_LABELS,
   SORTS,
+  stageParam,
   ADMIN_BOOKINGS_PATH,
   type BookingAdminFilters,
 } from "@/lib/admin/bookings-params";
@@ -97,7 +98,7 @@ export function BookingFilters({
           <input
             type="hidden"
             name={BOOKING_FILTER_PARAMS.payment}
-            value={filters.payment}
+            value={stageParam(filters.payment)}
           />
         )}
         {filters.ownerId && (

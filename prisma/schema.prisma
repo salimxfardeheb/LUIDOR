@@ -81,6 +81,8 @@ model User {
   rooms       Room[]           @relation("RoomOwner")
   bookings    Booking[]        @relation("BookingClient")
   payments    Payment[]        @relation("PaymentRecorder")
+  /// Reversements en espèces remis aux propriétaires par cet administrateur.
+  payouts     Payment[]        @relation("PaymentPayoutRecorder")
   reviews     Review[]         @relation("ReviewClient")
   favorites   Favorite[]
   /// Décisions de modération prises par cet administrateur.
@@ -385,6 +387,18 @@ model Booking {
   @@map("bookings")
 }
 
+/// Argent d'une réservation, suivi en deux temps.
+///
+/// Tout se règle en espèces : le client remet la somme à LIUDOR, qui la reverse
+/// ensuite au propriétaire. Les deux mouvements vivent sur la même ligne parce
+/// qu'ils portent sur la même réservation — c'est ce qui permet de lire d'un
+/// coup d'œil ce qui est encaissé mais pas encore reversé, la seule situation
+/// où la plateforme détient de l'argent qui ne lui appartient pas.
+///
+/// `status` et `paidAt` décrivent la première étape (client → LIUDOR), les
+/// champs `payout*` la seconde (LIUDOR → propriétaire). Un reversement sans
+/// encaissement est refusé par l'action serveur : la plateforme ne reverse pas
+/// ce qu'elle n'a pas reçu.
 model Payment {
   id         String        @id @default(cuid())
   bookingId  String        @unique
@@ -394,10 +408,21 @@ model Payment {
   recordedBy String?
   createdAt  DateTime      @default(now())
 
-  booking        Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  recordedByUser User?   @relation("PaymentRecorder", fields: [recordedBy], references: [id])
+  /// Somme remise au propriétaire. Distincte de `amount` : elle peut différer
+  /// du montant encaissé (arrangement, avoir), et la comparer au reçu est la
+  /// première chose que fait un contrôle de caisse.
+  payoutAmount     Decimal?  @db.Decimal(10, 2)
+  /// Date du reversement au propriétaire, `null` tant que rien n'est reversé.
+  payoutAt         DateTime?
+  /// Administrateur ayant remis les espèces au propriétaire.
+  payoutRecordedBy String?
+
+  booking              Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  recordedByUser       User?   @relation("PaymentRecorder", fields: [recordedBy], references: [id])
+  payoutRecordedByUser User?   @relation("PaymentPayoutRecorder", fields: [payoutRecordedBy], references: [id])
 
   @@index([status])
+  @@index([payoutAt])
   @@map("payments")
 }
 
@@ -489,6 +514,7 @@ enum AuditAction {
   BOOKING_CONFIRMED
   BOOKING_CANCELLED
   PAYMENT_RECORDED
+  PAYMENT_PAID_OUT
   REVIEW_PUBLISHED
   REVIEW_DELETED
   POST_PUBLISHED

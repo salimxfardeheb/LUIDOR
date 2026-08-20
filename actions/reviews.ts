@@ -60,7 +60,7 @@ export async function submitReview(
     }
 
     // La modération est un réglage de la plateforme : publié d'emblée, ou mis
-    // en attente pour être relu depuis /admin/avis.
+    // en attente d'une relecture faite hors interface.
     const autoPublish = await shouldAutoPublishReviews();
 
     await prisma.review.create({
@@ -76,7 +76,6 @@ export async function submitReview(
     revalidatePath("/historique");
     revalidatePath("/profil");
     revalidatePath(`/salles/${roomId}`);
-    revalidatePath("/admin/avis");
 
     return {
       ok: true,

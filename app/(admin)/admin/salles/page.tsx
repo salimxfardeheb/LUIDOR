@@ -3,11 +3,11 @@ import Link from "next/link";
 import { BadgeCheck, ClipboardCheck, Clock, RotateCcw, ShieldCheck } from "lucide-react";
 import { requireAdminPage } from "@/lib/admin/guards";
 import {
-  getOwnerName,
   HISTORY_LIMIT,
   listModerationHistory,
   listPendingRooms,
 } from "@/lib/admin/rooms";
+import { getOwnerName } from "@/lib/admin/users";
 import { formatNumber } from "@/lib/format";
 import { ModerationHistoryTable } from "@/components/admin/ModerationHistoryTable";
 import { PendingRoomCard } from "@/components/admin/PendingRoomCard";
@@ -141,7 +141,10 @@ export default async function Page({ searchParams }: PageProps) {
             action={
               ownerId
                 ? { href: PATH, label: "Voir toute la file" }
-                : { href: "/admin/dashboard", label: "Retour au tableau de bord" }
+                : {
+                    href: "/admin/proprietaires",
+                    label: "Voir les propriétaires",
+                  }
             }
           />
         ) : (

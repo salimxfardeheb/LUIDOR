@@ -6,13 +6,14 @@ import type { UserFilters } from "@/lib/admin/users-params";
 /**
  * Lectures des pages comptes de l'administration.
  *
- * Un seul module pour les utilisateurs et les propriétaires : ces derniers sont
- * les mêmes comptes, filtrés sur `role = OWNER` et enrichis de leur activité.
- * Le `where` est donc construit une fois, ce qui garantit que la recherche et
- * les filtres se comportent pareil sur les deux pages.
+ * Un seul module pour les clients et les propriétaires : ce sont les mêmes
+ * comptes, filtrés sur leur rôle et enrichis de l'activité qui compte pour
+ * chacun — les réservations passées d'un côté, les salles publiées de l'autre.
+ * Le `where` est construit une fois, ce qui garantit que la recherche et le
+ * filtre de statut se comportent pareil sur les deux pages.
  */
 
-export interface AdminUserRow {
+interface AdminAccountRow {
   id: string;
   fullName: string;
   email: string;
@@ -23,13 +24,22 @@ export interface AdminUserRow {
   createdAt: string;
   /** Date de suspension au format ISO, ou `null` pour un compte actif. */
   suspendedAt: string | null;
-  /** Salles détenues (rôle propriétaire). */
-  roomsCount: number;
-  /** Réservations passées en tant que client. */
-  bookingsCount: number;
 }
 
-export interface AdminOwnerRow extends AdminUserRow {
+export interface AdminClientRow extends AdminAccountRow {
+  /** Réservations déposées, tous statuts confondus. */
+  bookingsCount: number;
+  /** Réservations confirmées : l'activité réelle du compte. */
+  confirmedBookingsCount: number;
+  /** Total déjà encaissé en espèces sur ses réservations. */
+  paidTotal: number;
+  /** Date de la dernière demande, au format ISO. `null` si aucune. */
+  lastBookingAt: string | null;
+}
+
+export interface AdminOwnerRow extends AdminAccountRow {
+  /** Salles détenues, tous statuts confondus. */
+  roomsCount: number;
   /** Salles publiées au catalogue. */
   activeRoomsCount: number;
   /** Dossiers en attente de validation. */
@@ -39,16 +49,18 @@ export interface AdminOwnerRow extends AdminUserRow {
 }
 
 export interface AdminUserCounts {
-  total: number;
-  byRole: Record<Role, number>;
-  suspended: number;
+  clients: number;
+  owners: number;
+  suspendedClients: number;
+  suspendedOwners: number;
 }
 
-/** Traduit les filtres de l'URL en clause Prisma. */
-function whereFromFilters(filters: UserFilters): Prisma.UserWhereInput {
-  const where: Prisma.UserWhereInput = {};
-
-  if (filters.role) where.role = filters.role;
+/** Traduit les filtres de l'URL en clause Prisma, pour un rôle donné. */
+function whereFromFilters(
+  filters: UserFilters,
+  role: Role
+): Prisma.UserWhereInput {
+  const where: Prisma.UserWhereInput = { role };
 
   if (filters.status) {
     where.suspendedAt = filters.status === "SUSPENDED" ? { not: null } : null;
@@ -59,13 +71,14 @@ function whereFromFilters(filters: UserFilters): Prisma.UserWhereInput {
     where.OR = [
       { fullName: { contains: filters.search, mode: "insensitive" } },
       { email: { contains: filters.search, mode: "insensitive" } },
+      { phone: { contains: filters.search, mode: "insensitive" } },
     ];
   }
 
   return where;
 }
 
-const userRowSelect = {
+const accountSelect = {
   id: true,
   fullName: true,
   email: true,
@@ -74,28 +87,70 @@ const userRowSelect = {
   role: true,
   createdAt: true,
   suspendedAt: true,
-  _count: { select: { rooms: true, bookings: true } },
 } as const;
 
-/** Comptes correspondant aux filtres, du plus récent au plus ancien. */
-export async function listUsers(filters: UserFilters): Promise<AdminUserRow[]> {
-  const users = await prisma.user.findMany({
-    where: whereFromFilters(filters),
+function toAccountRow(account: {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string | null;
+  avatarUrl: string | null;
+  role: Role;
+  createdAt: Date;
+  suspendedAt: Date | null;
+}): AdminAccountRow {
+  return {
+    id: account.id,
+    fullName: account.fullName,
+    email: account.email,
+    phone: account.phone,
+    avatarUrl: account.avatarUrl,
+    role: account.role,
+    createdAt: account.createdAt.toISOString(),
+    suspendedAt: account.suspendedAt?.toISOString() ?? null,
+  };
+}
+
+/**
+ * Comptes clients et leur activité, du plus récent au plus ancien.
+ *
+ * Les réservations sont lues avec le compte plutôt que comptées par requêtes
+ * séparées : la liste a besoin du statut de chacune (confirmées) et du montant
+ * encaissé, deux informations qu'un `_count` ne sait pas donner.
+ */
+export async function listClients(
+  filters: UserFilters
+): Promise<AdminClientRow[]> {
+  const clients = await prisma.user.findMany({
+    where: whereFromFilters(filters, "CLIENT"),
     orderBy: { createdAt: "desc" },
-    select: userRowSelect,
+    select: {
+      ...accountSelect,
+      bookings: {
+        orderBy: { createdAt: "desc" },
+        select: {
+          status: true,
+          createdAt: true,
+          payment: { select: { amount: true, status: true } },
+        },
+      },
+    },
   });
 
-  return users.map((user) => ({
-    id: user.id,
-    fullName: user.fullName,
-    email: user.email,
-    phone: user.phone,
-    avatarUrl: user.avatarUrl,
-    role: user.role,
-    createdAt: user.createdAt.toISOString(),
-    suspendedAt: user.suspendedAt?.toISOString() ?? null,
-    roomsCount: user._count.rooms,
-    bookingsCount: user._count.bookings,
+  return clients.map((client) => ({
+    ...toAccountRow(client),
+    bookingsCount: client.bookings.length,
+    confirmedBookingsCount: client.bookings.filter(
+      (booking) => booking.status === "CONFIRMEE"
+    ).length,
+    paidTotal: client.bookings.reduce(
+      (sum, booking) =>
+        booking.payment?.status === "PAID"
+          ? sum + Number(booking.payment.amount)
+          : sum,
+      0
+    ),
+    lastBookingAt: client.bookings[0]?.createdAt.toISOString() ?? null,
   }));
 }
 
@@ -110,10 +165,10 @@ export async function listOwners(
   filters: UserFilters
 ): Promise<AdminOwnerRow[]> {
   const owners = await prisma.user.findMany({
-    where: { ...whereFromFilters(filters), role: "OWNER" },
+    where: whereFromFilters(filters, "OWNER"),
     orderBy: { createdAt: "desc" },
     select: {
-      ...userRowSelect,
+      ...accountSelect,
       rooms: {
         select: { status: true, _count: { select: { bookings: true } } },
       },
@@ -121,16 +176,8 @@ export async function listOwners(
   });
 
   return owners.map((owner) => ({
-    id: owner.id,
-    fullName: owner.fullName,
-    email: owner.email,
-    phone: owner.phone,
-    avatarUrl: owner.avatarUrl,
-    role: owner.role,
-    createdAt: owner.createdAt.toISOString(),
-    suspendedAt: owner.suspendedAt?.toISOString() ?? null,
-    roomsCount: owner._count.rooms,
-    bookingsCount: owner._count.bookings,
+    ...toAccountRow(owner),
+    roomsCount: owner.rooms.length,
     activeRoomsCount: owner.rooms.filter((room) => room.status === "ACTIVE")
       .length,
     pendingRoomsCount: owner.rooms.filter((room) => room.status === "PENDING")
@@ -144,17 +191,22 @@ export async function listOwners(
 
 /** Répartition des comptes, affichée en résumé au-dessus des listes. */
 export async function getUserCounts(): Promise<AdminUserCounts> {
-  const [roleGroups, suspended] = await Promise.all([
-    prisma.user.groupBy({ by: ["role"], _count: { _all: true } }),
-    prisma.user.count({ where: { suspendedAt: { not: null } } }),
+  const [clients, owners, suspendedClients, suspendedOwners] = await Promise.all([
+    prisma.user.count({ where: { role: "CLIENT" } }),
+    prisma.user.count({ where: { role: "OWNER" } }),
+    prisma.user.count({ where: { role: "CLIENT", suspendedAt: { not: null } } }),
+    prisma.user.count({ where: { role: "OWNER", suspendedAt: { not: null } } }),
   ]);
 
-  const byRole: Record<Role, number> = { CLIENT: 0, OWNER: 0, ADMIN: 0 };
-  let total = 0;
-  for (const group of roleGroups) {
-    byRole[group.role] = group._count._all;
-    total += group._count._all;
-  }
+  return { clients, owners, suspendedClients, suspendedOwners };
+}
 
-  return { total, byRole, suspended };
+/** Nom d'un propriétaire, pour intituler une liste filtrée sur ses salles. */
+export async function getOwnerName(ownerId: string): Promise<string | null> {
+  const owner = await prisma.user.findFirst({
+    where: { id: ownerId, role: "OWNER" },
+    select: { fullName: true },
+  });
+
+  return owner?.fullName ?? null;
 }

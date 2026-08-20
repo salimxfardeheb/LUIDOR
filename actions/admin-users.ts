@@ -23,7 +23,7 @@ const payloadSchema = z.object({
 });
 
 function revalidateUsers() {
-  revalidatePath("/admin/utilisateurs");
+  revalidatePath("/admin/clients");
   revalidatePath("/admin/proprietaires");
   revalidatePath("/admin/dashboard");
 }

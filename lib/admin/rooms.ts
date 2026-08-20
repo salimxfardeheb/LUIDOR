@@ -221,13 +221,3 @@ export async function listModerationHistory(
     },
   }));
 }
-
-/** Nom d'un propriétaire, pour intituler une file filtrée. */
-export async function getOwnerName(ownerId: string): Promise<string | null> {
-  const owner = await prisma.user.findFirst({
-    where: { id: ownerId, role: "OWNER" },
-    select: { fullName: true },
-  });
-
-  return owner?.fullName ?? null;
-}

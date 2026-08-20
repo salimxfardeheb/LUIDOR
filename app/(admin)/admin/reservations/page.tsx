@@ -8,11 +8,7 @@ import {
   ShieldQuestion,
 } from "lucide-react";
 import { requireAdminPage } from "@/lib/admin/guards";
-import {
-  getBookingCounts,
-  listAdminBookings,
-  listAdminOptions,
-} from "@/lib/admin/bookings";
+import { getBookingCounts, listAdminBookings } from "@/lib/admin/bookings";
 import {
   ADMIN_BOOKINGS_PATH,
   buildBookingsHref,
@@ -21,7 +17,7 @@ import {
   parseBookingAdminFilters,
   type BookingSearchParams,
 } from "@/lib/admin/bookings-params";
-import { getOwnerName } from "@/lib/admin/rooms";
+import { getOwnerName } from "@/lib/admin/users";
 import { formatNumber, formatPrice } from "@/lib/format";
 import { BookingFilters } from "@/components/admin/BookingFilters";
 import { BookingsTable } from "@/components/admin/BookingsTable";
@@ -38,7 +34,7 @@ interface PageProps {
 }
 
 export default async function Page({ searchParams }: PageProps) {
-  const session = await requireAdminPage(ADMIN_BOOKINGS_PATH);
+  await requireAdminPage(ADMIN_BOOKINGS_PATH);
 
   const requested = parseBookingAdminFilters(searchParams);
 
@@ -49,10 +45,9 @@ export default async function Page({ searchParams }: PageProps) {
     : null;
   const filters = ownerName ? requested : { ...requested, ownerId: null };
 
-  const [bookings, counts, admins] = await Promise.all([
+  const [bookings, counts] = await Promise.all([
     listAdminBookings(filters),
     getBookingCounts(),
-    listAdminOptions(),
   ]);
 
   const filtered = hasActiveBookingFilters(filters);
@@ -60,8 +55,8 @@ export default async function Page({ searchParams }: PageProps) {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Toutes les réservations"
-        description="Les demandes reçues sur l'ensemble des salles. Les paiements se règlent en espèces : ils sont enregistrés ici une fois encaissés."
+        title="Réservations"
+        description="Les demandes reçues sur l'ensemble des salles. Ouvrez une réservation pour son détail complet : la salle, le dossier client et le suivi des espèces."
       />
 
       {filters.ownerId && ownerName && (
@@ -138,17 +133,13 @@ export default async function Page({ searchParams }: PageProps) {
                   href: buildBookingsHref(NO_BOOKING_FILTERS),
                   label: "Voir toutes les réservations",
                 }
-              : { href: "/admin/salles", label: "Voir les salles" }
+              : { href: "/admin/salles", label: "Voir la file de validation" }
           }
         />
       ) : (
         <Card>
           <CardContent className="p-6">
-            <BookingsTable
-              bookings={bookings}
-              admins={admins}
-              currentAdminId={session.adminId}
-            />
+            <BookingsTable bookings={bookings} />
           </CardContent>
         </Card>
       )}

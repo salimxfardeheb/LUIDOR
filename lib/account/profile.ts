@@ -60,7 +60,7 @@ export type AccountKpiKey =
   | "receivedReviews"
   | "roomsToApprove"
   | "bookingsToVerify"
-  | "messagesToHandle";
+  | "cashToPayout";
 
 export interface AccountKpi {
   key: AccountKpiKey;
@@ -144,12 +144,13 @@ export async function getAccountKpis(
   }
 
   if (role === "ADMIN") {
-    const [roomsToApprove, bookingsToVerify, messagesToHandle] =
-      await Promise.all([
-        prisma.room.count({ where: { status: "PENDING" } }),
-        prisma.booking.count({ where: { status: "EN_COURS_VERIFICATION" } }),
-        prisma.contactMessage.count({ where: { readAt: null } }),
-      ]);
+    const [roomsToApprove, bookingsToVerify, cashToPayout] = await Promise.all([
+      prisma.room.count({ where: { status: "PENDING" } }),
+      prisma.booking.count({ where: { status: "EN_COURS_VERIFICATION" } }),
+      // Encaissé auprès du client, pas encore remis au propriétaire : la seule
+      // situation où la plateforme détient de l'argent qui ne lui revient pas.
+      prisma.payment.count({ where: { status: "PAID", payoutAt: null } }),
+    ]);
 
     return [
       {
@@ -165,10 +166,10 @@ export async function getAccountKpis(
         note: "réservations en cours de vérification",
       },
       {
-        key: "messagesToHandle",
-        label: "Messages à traiter",
-        value: messagesToHandle,
-        note: "messages de contact non lus",
+        key: "cashToPayout",
+        label: "Espèces à reverser",
+        value: cashToPayout,
+        note: "encaissées, en attente de reversement",
       },
       personal[1],
     ];

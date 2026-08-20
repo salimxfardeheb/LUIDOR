@@ -28,15 +28,19 @@ interface PageProps {
 export default async function Page({ searchParams }: PageProps) {
   await requireAdminPage(OWNERS_PATH);
 
-  // Le rôle est imposé par la page : le filtre de rôle n'est pas proposé, et
-  // un `?role=` dans l'URL ne peut pas élargir la liste à d'autres comptes.
-  const filters = parseUserFilters(searchParams, "OWNER");
+  // Le rôle est imposé par la page : aucun paramètre d'URL ne peut élargir la
+  // liste aux clients ou aux comptes administrateur.
+  const filters = parseUserFilters(searchParams);
   const owners = await listOwners(filters);
 
-  const filtered = hasActiveUserFilters(filters, { ignoreRole: true });
+  const filtered = hasActiveUserFilters(filters);
 
   const activeRooms = owners.reduce(
     (sum, owner) => sum + owner.activeRoomsCount,
+    0
+  );
+  const pendingRooms = owners.reduce(
+    (sum, owner) => sum + owner.pendingRoomsCount,
     0
   );
   const bookings = owners.reduce(
@@ -48,7 +52,7 @@ export default async function Page({ searchParams }: PageProps) {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Gestion des propriétaires"
+        title="Propriétaires"
         description="Les comptes qui publient des salles sur LIUDOR, avec leur activité et un accès direct à leurs dossiers."
       />
 
@@ -84,8 +88,7 @@ export default async function Page({ searchParams }: PageProps) {
       <UserFilters
         path={OWNERS_PATH}
         filters={filters}
-        showRoleFilter={false}
-        searchPlaceholder="Rechercher un propriétaire par nom ou email…"
+        searchPlaceholder="Rechercher un propriétaire par nom, email ou téléphone…"
       />
 
       <p className="text-sm text-gray-500" aria-live="polite">
@@ -93,7 +96,11 @@ export default async function Page({ searchParams }: PageProps) {
           ? "Aucun propriétaire à afficher."
           : `${owners.length} propriétaire${owners.length > 1 ? "s" : ""} affiché${
               owners.length > 1 ? "s" : ""
-            }${filtered ? " pour ces filtres" : ""}.`}
+            }${filtered ? " pour ces filtres" : ""}${
+              pendingRooms > 0
+                ? `, ${pendingRooms} dossier${pendingRooms > 1 ? "s" : ""} en attente de validation`
+                : ""
+            }.`}
       </p>
 
       {owners.length === 0 ? (
@@ -112,13 +119,10 @@ export default async function Page({ searchParams }: PageProps) {
           action={
             filtered
               ? {
-                  href: buildUsersHref(OWNERS_PATH, {
-                    ...NO_USER_FILTERS,
-                    role: "OWNER",
-                  }),
+                  href: buildUsersHref(OWNERS_PATH, NO_USER_FILTERS),
                   label: "Voir tous les propriétaires",
                 }
-              : { href: "/admin/utilisateurs", label: "Voir tous les comptes" }
+              : undefined
           }
         />
       ) : (

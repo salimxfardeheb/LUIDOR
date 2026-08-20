@@ -2,8 +2,8 @@ import {
   Building2,
   CalendarCheck,
   CalendarClock,
+  HandCoins,
   Heart,
-  Mail,
   ShieldCheck,
   Star,
   Wallet,
@@ -27,7 +27,7 @@ const ICONS: Record<AccountKpiKey, LucideIcon> = {
   receivedReviews: Star,
   roomsToApprove: ShieldCheck,
   bookingsToVerify: Wallet,
-  messagesToHandle: Mail,
+  cashToPayout: HandCoins,
 };
 
 /** Résumé chiffré du compte, en cartes KPI. */

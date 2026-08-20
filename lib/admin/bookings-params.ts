@@ -1,5 +1,11 @@
-import type { BookingStatus, PaymentStatus } from "@prisma/client";
+import type { BookingStatus } from "@prisma/client";
 import { isBookingStatus } from "@/lib/bookings/status";
+import {
+  PAYMENT_STAGES,
+  PAYMENT_STAGE_LABELS,
+  stageParam,
+  type PaymentStage,
+} from "@/lib/admin/payments-params";
 
 /**
  * Recherche, filtres et tri de la liste des réservations, portés par l'URL.
@@ -21,15 +27,19 @@ export const BOOKING_FILTER_PARAMS = {
 
 export const ALL_FILTER_VALUE = "toutes";
 
-/** Filtre de paiement : payé, en attente, ou aucun paiement enregistré. */
-export const PAYMENT_FILTERS = ["PAID", "PENDING", "NONE"] as const;
-export type PaymentFilter = (typeof PAYMENT_FILTERS)[number];
+/**
+ * Filtre de paiement : les trois étapes du circuit des espèces.
+ *
+ * Le vocabulaire est celui de la page des paiements, réutilisé tel quel : une
+ * réservation « à reverser » doit s'appeler pareil des deux côtés, sans quoi
+ * l'équipe croirait manipuler deux notions différentes.
+ */
+export const PAYMENT_FILTERS = PAYMENT_STAGES;
+export type PaymentFilter = PaymentStage;
 
-export const PAYMENT_FILTER_LABELS: Record<PaymentFilter, string> = {
-  PAID: "Encaissé",
-  PENDING: "En attente d'encaissement",
-  NONE: "Aucun paiement enregistré",
-};
+export const PAYMENT_FILTER_LABELS = PAYMENT_STAGE_LABELS;
+
+export { stageParam };
 
 export const SORTS = ["recentes", "anciennes", "evenement", "montant"] as const;
 export type BookingSort = (typeof SORTS)[number];
@@ -70,8 +80,9 @@ export interface BookingSearchParams {
   proprietaire?: string;
 }
 
-function isPaymentFilter(value: string): value is PaymentFilter {
-  return (PAYMENT_FILTERS as readonly string[]).includes(value);
+/** Étape désignée par la valeur d'URL, ou `null` si elle est inconnue. */
+function paymentFilterFrom(value: string): PaymentFilter | null {
+  return PAYMENT_FILTERS.find((stage) => stageParam(stage) === value) ?? null;
 }
 
 function isSort(value: string): value is BookingSort {
@@ -90,10 +101,9 @@ export function parseBookingAdminFilters(
       searchParams.statut && isBookingStatus(searchParams.statut)
         ? searchParams.statut
         : null,
-    payment:
-      searchParams.paiement && isPaymentFilter(searchParams.paiement)
-        ? searchParams.paiement
-        : null,
+    payment: searchParams.paiement
+      ? paymentFilterFrom(searchParams.paiement)
+      : null,
     ownerId: searchParams.proprietaire || null,
     sort:
       searchParams.tri && isSort(searchParams.tri)
@@ -121,7 +131,9 @@ export function buildBookingsHref(filters: BookingAdminFilters): string {
 
   if (filters.search) params.set(BOOKING_FILTER_PARAMS.search, filters.search);
   if (filters.status) params.set(BOOKING_FILTER_PARAMS.status, filters.status);
-  if (filters.payment) params.set(BOOKING_FILTER_PARAMS.payment, filters.payment);
+  if (filters.payment) {
+    params.set(BOOKING_FILTER_PARAMS.payment, stageParam(filters.payment));
+  }
   if (filters.ownerId) params.set(BOOKING_FILTER_PARAMS.owner, filters.ownerId);
   if (filters.sort !== DEFAULT_SORT) {
     params.set(BOOKING_FILTER_PARAMS.sort, filters.sort);
@@ -130,10 +142,3 @@ export function buildBookingsHref(filters: BookingAdminFilters): string {
   const query = params.toString();
   return query ? `${ADMIN_BOOKINGS_PATH}?${query}` : ADMIN_BOOKINGS_PATH;
 }
-
-/** Libellé du statut de paiement d'une réservation. */
-export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
-  PENDING: "En attente",
-  PAID: "Encaissé",
-  REFUNDED: "Remboursé",
-};

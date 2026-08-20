@@ -1,16 +1,11 @@
 import {
   BadgeCheck,
-  CalendarDays,
-  CalendarX2,
-  ClipboardList,
+  Banknote,
+  CalendarRange,
   LayoutDashboard,
-  LayoutGrid,
-  MessageSquareQuote,
   PenLine,
-  Settings,
-  ShieldCheck,
   Store,
-  Tags,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -19,6 +14,11 @@ import {
  *
  * Déclaré à part de la colonne : les libellés servent aussi au fil d'Ariane et
  * aux titres de page, et une entrée ajoutée ici apparaît partout d'un coup.
+ *
+ * Le plan suit le travail réel de l'équipe : qui est inscrit, quelles salles
+ * attendent d'être validées, quelles réservations sont en cours, où en est
+ * l'argent, et ce qui se publie sur le blog. Une section n'existe que si elle
+ * a un écran derrière — pas de page d'attente dans le menu.
  */
 
 export interface AdminNavItem {
@@ -45,69 +45,44 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     ],
   },
   {
-    title: "Gestion de la plateforme",
+    // Clients et propriétaires sont les mêmes comptes en base, mais deux
+    // métiers différents à l'écran : on ne regarde pas un client comme on
+    // regarde quelqu'un qui met une salle en ligne.
+    title: "Gestion des utilisateurs",
     items: [
-      { href: "/admin/salles", label: "Salles", icon: LayoutGrid },
-      { href: "/admin/categories", label: "Catégories de salles", icon: Tags },
+      { href: "/admin/clients", label: "Clients", icon: UserRound },
+      { href: "/admin/proprietaires", label: "Propriétaires", icon: Store },
+    ],
+  },
+  {
+    title: "Exploitation",
+    items: [
       {
-        href: "/admin/demandes",
-        label: "Demandes d'inscription",
-        icon: ClipboardList,
-      },
-      {
-        href: "/admin/verification",
-        label: "Vérification des salles",
+        href: "/admin/salles",
+        label: "Validation des salles",
         icon: BadgeCheck,
       },
-    ],
-  },
-  {
-    title: "Réservations",
-    items: [
       {
         href: "/admin/reservations",
-        label: "Toutes les réservations",
-        icon: Store,
+        label: "Réservations",
+        icon: CalendarRange,
       },
-      {
-        href: "/admin/calendrier",
-        label: "Calendrier global",
-        icon: CalendarDays,
-      },
-      { href: "/admin/annulations", label: "Annulations", icon: CalendarX2 },
-      {
-        href: "/admin/avis",
-        label: "Avis & Commentaires",
-        icon: MessageSquareQuote,
-      },
+      { href: "/admin/paiements", label: "Paiements", icon: Banknote },
     ],
   },
   {
-    // Le blog est éditorial : le ranger avec les salles brouillerait un groupe
-    // qui ne parle que du parc de salles. Ce groupe accueillera les autres
-    // contenus du site le jour où il y en aura.
     title: "Contenu",
     items: [{ href: "/admin/blog", label: "Blog", icon: PenLine }],
-  },
-  {
-    title: "Paramètres",
-    items: [
-      {
-        href: "/admin/parametres",
-        label: "Paramètres généraux",
-        icon: Settings,
-      },
-      { href: "/admin/securite", label: "Sécurité & Logs", icon: ShieldCheck },
-    ],
   },
 ];
 
 /**
  * Entrée correspondant au chemin courant.
  *
- * Comparaison par préfixe pour qu'une sous-page (`/admin/salles/<id>`) garde sa
- * section en surbrillance, mais la correspondance exacte l'emporte : sans cela
- * `/admin/salles` resterait actif sur toute page commençant par le même début.
+ * Comparaison par préfixe pour qu'une sous-page (`/admin/reservations/<id>`)
+ * garde sa section en surbrillance, mais la correspondance exacte l'emporte :
+ * sans cela `/admin/salles` resterait actif sur toute page commençant par le
+ * même début.
  */
 export function activeAdminHref(pathname: string): string | null {
   const items = ADMIN_NAV.flatMap((group) => group.items);

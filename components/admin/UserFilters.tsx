@@ -1,8 +1,7 @@
 import Link from "next/link";
-import { RotateCcw, Search, ShieldCheck, UserCog } from "lucide-react";
+import { RotateCcw, Search, ShieldCheck } from "lucide-react";
 import { FilterSelect } from "@/components/ui/FilterSelect";
 import { Input } from "@/components/ui/Input";
-import { ROLE_LABELS } from "@/lib/roles";
 import {
   ACCOUNT_STATUSES,
   ACCOUNT_STATUS_LABELS,
@@ -10,44 +9,27 @@ import {
   buildUsersHref,
   hasActiveUserFilters,
   NO_USER_FILTERS,
-  ROLES,
   USER_FILTER_PARAMS,
   type UserFilters as Filters,
 } from "@/lib/admin/users-params";
 
 /**
- * Barre de filtres des pages comptes : recherche, rôle et statut.
+ * Barre de filtres des pages comptes : recherche et statut.
  *
  * Composant serveur : il ne fait que préparer les destinations de chaque
  * option, l'interactivité vit dans `FilterSelect`. La recherche est un vrai
- * formulaire `GET` — elle fonctionne sans JavaScript, et les autres filtres
- * actifs voyagent en champs cachés pour ne pas être perdus à la validation.
+ * formulaire `GET` — elle fonctionne sans JavaScript, et le statut actif
+ * voyage en champ caché pour ne pas être perdu à la validation.
  */
 export function UserFilters({
   path,
   filters,
-  /** `false` sur la page propriétaires, où le rôle est imposé. */
-  showRoleFilter = true,
   searchPlaceholder = "Rechercher un nom ou un email…",
 }: {
   path: string;
   filters: Filters;
-  showRoleFilter?: boolean;
   searchPlaceholder?: string;
 }) {
-  const roleOptions = [
-    {
-      value: ALL_FILTER_VALUE,
-      label: "Tous les rôles",
-      href: buildUsersHref(path, { ...filters, role: null }),
-    },
-    ...ROLES.map((role) => ({
-      value: role,
-      label: ROLE_LABELS[role].label,
-      href: buildUsersHref(path, { ...filters, role }),
-    })),
-  ];
-
   const statusOptions = [
     {
       value: ALL_FILTER_VALUE,
@@ -60,8 +42,6 @@ export function UserFilters({
       href: buildUsersHref(path, { ...filters, status }),
     })),
   ];
-
-  const filtered = hasActiveUserFilters(filters, { ignoreRole: !showRoleFilter });
 
   return (
     <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 shadow-sm lg:flex-row lg:items-end">
@@ -86,15 +66,8 @@ export function UserFilters({
           placeholder={searchPlaceholder}
         />
 
-        {/* Les filtres actifs suivent la recherche : sans ces champs, valider
-            le formulaire les effacerait de l'URL. */}
-        {showRoleFilter && filters.role && (
-          <input
-            type="hidden"
-            name={USER_FILTER_PARAMS.role}
-            value={filters.role}
-          />
-        )}
+        {/* Le statut suit la recherche : sans ce champ, valider le formulaire
+            l'effacerait de l'URL. */}
         {filters.status && (
           <input
             type="hidden"
@@ -107,17 +80,6 @@ export function UserFilters({
         </button>
       </form>
 
-      {showRoleFilter && (
-        <FilterSelect
-          id="filtre-role"
-          label="Rôle"
-          icon={<UserCog aria-hidden className="h-4 w-4 text-secondary" />}
-          value={filters.role ?? ALL_FILTER_VALUE}
-          options={roleOptions}
-          className="lg:w-52"
-        />
-      )}
-
       <FilterSelect
         id="filtre-statut-compte"
         label="Statut"
@@ -127,12 +89,9 @@ export function UserFilters({
         className="lg:w-52"
       />
 
-      {filtered && (
+      {hasActiveUserFilters(filters) && (
         <Link
-          href={buildUsersHref(path, {
-            ...NO_USER_FILTERS,
-            role: showRoleFilter ? null : filters.role,
-          })}
+          href={buildUsersHref(path, NO_USER_FILTERS)}
           scroll={false}
           className="inline-flex items-center gap-1.5 self-start rounded-md px-1 py-2 text-sm font-semibold text-secondary transition-colors hover:text-primary-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 lg:self-auto lg:py-2.5"
         >

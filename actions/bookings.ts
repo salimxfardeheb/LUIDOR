@@ -130,7 +130,7 @@ export async function submitBookingRequest(
       };
     }
 
-    // Délai minimum de préparation, réglé dans /admin/parametres : l'équipe doit
+    // Délai minimum de préparation, réglé en base (`PlatformSettings`) : l'équipe doit
     // avoir le temps de rappeler le client avant l'événement.
     const earliest = startOfTodayUtc();
     earliest.setUTCDate(earliest.getUTCDate() + settings.bookingLeadTimeDays);
@@ -214,6 +214,7 @@ export async function submitBookingRequest(
     });
 
     revalidatePath("/admin/reservations");
+    revalidatePath("/admin/paiements");
     revalidatePath("/admin/dashboard");
     revalidatePath("/reservations");
     revalidatePath("/historique");

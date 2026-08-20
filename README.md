@@ -102,7 +102,7 @@ Le stockage des photos (salles, avatars, couvertures d'articles). Sans configura
 
 ### Facultatives — SMTP
 
-Envoi d'une copie des messages du formulaire `/contact` à l'équipe. **Tant que `SMTP_HOST` est vide, l'envoi est neutralisé** : le message reste persisté en base et se lit depuis `/admin/messages`, qui fait de toute façon foi.
+Envoi d'une copie des messages du formulaire `/contact` à l'équipe. **Tant que `SMTP_HOST` est vide, l'envoi est neutralisé** : le message reste persisté en base (table `contact_messages`), qui fait de toute façon foi.
 
 | Variable | Défaut | Description |
 | --- | --- | --- |
@@ -127,16 +127,16 @@ Le schéma vit dans [`prisma/schema.prisma`](prisma/schema.prisma) — 19 modèl
 | `Room` | Salle. Cycle de vie `PENDING → ACTIVE / REJECTED`, plus `SUSPENDED` hors ligne. Seules les salles `ACTIVE` sont publiques. |
 | `RoomCategory` | Rattachement salle ↔ catégorie. Une salle peut servir plusieurs types d'événement. **Invariant :** la catégorie principale (`Room.categoryId`) figure toujours dans cette table. |
 | `Booking` | Réservation. `EN_ATTENTE → EN_COURS_VERIFICATION → CONFIRMEE → CLOTUREE`, ou `ANNULEE`. |
-| `Payment` | Encaissement en espèces. `bookingId` unique : un second enregistrement corrige le montant. |
+| `Payment` | Argent d'une réservation, en espèces et en deux temps : `status`/`paidAt` pour l'encaissement client → LIUDOR, `payout*` pour le reversement LIUDOR → propriétaire. `bookingId` unique : un second enregistrement corrige le montant. |
 | `Review` | Avis client. `publishedAt` nul = en attente de modération. Unique par couple (salle, client). |
 | `Availability` | Calendrier d'une salle. **Une date sans ligne est considérée fermée.** |
 | `RoomModeration` | Historique des décisions de validation / rejet, avec leur motif. |
-| `AuditLog` | Journal des actions sensibles, lu par `/admin/parametres#securite`. |
+| `AuditLog` | Journal des actions sensibles. Écrit par les actions serveur ; aucune interface ne le lit, il se consulte en base. |
 | `PlatformSettings` | Réglages généraux. Une seule ligne, `id = "platform"`. |
 
 ### Migrations
 
-Dix migrations versionnées dans [`prisma/migrations/`](prisma/migrations/), de `20260803205007_init` à `20260805220253_blog_cover_public_id`.
+Onze migrations versionnées dans [`prisma/migrations/`](prisma/migrations/), de `20260803205007_init` à `20260820002923_payment_owner_payout`.
 
 ```bash
 npm run db:migrate      # applique les migrations et régénère le client
@@ -392,7 +392,7 @@ Version `0.1.0` — **en développement, pas encore déployable en production.**
 
 ### Fonctionnel
 
-Catalogue public avec recherche, filtres et pagination · fiche salle détaillée (photos, équipements, services, avis, calendrier, carte) · blog · formulaire de contact · inscription et connexion · espace client (profil, avatar, favoris, historique, dépôt d'avis) · portail propriétaire (salles, photos, calendrier de disponibilités, réservations, tableau de bord) · administration (modération des salles, réservations, encaissements, utilisateurs, avis, blog, catalogue, réglages, journal de sécurité).
+Catalogue public avec recherche, filtres et pagination · fiche salle détaillée (photos, équipements, services, avis, calendrier, carte) · blog · formulaire de contact · inscription et connexion · espace client (profil, avatar, favoris, historique, dépôt d'avis) · portail propriétaire (salles, photos, calendrier de disponibilités, réservations, tableau de bord) · administration (clients, propriétaires, validation des salles, réservations et leur détail, suivi des paiements en espèces, blog).
 
 ### En cours ou absent
 
@@ -400,7 +400,7 @@ Catalogue public avec recherche, filtres et pagination · fiche salle détaillé
 | --- | --- |
 | **Création de réservation par un client** | ❌ Non implémentée. Les réservations visibles proviennent du seed. Toute la chaîne aval (statuts, paiements, avis) est en place et attend ce maillon. |
 | Réglages `maintenanceMode` et `bookingLeadTimeDays` | ⚠️ Configurables et persistés, mais **jamais appliqués** — ils dépendent de la création de réservation |
-| Pages `/admin/verification`, `/admin/calendrier`, `/admin/demandes`, `/admin/annulations` | ⚠️ Maquettes vides, accessibles depuis la navigation |
+| Modération des avis, réglages de la plateforme, catalogue et journal de sécurité | ❌ Retirés de l'administration lors du recentrage du portail. Les données restent en base ; `reviewAutoPublish` et `bookingLeadTimeDays` ne sont plus éditables depuis l'interface. |
 | Page `/proprietaires/[id]` | ⚠️ Maquette vide, publique |
 | Mot de passe oublié | ❌ Absent |
 | Vérification d'email à l'inscription | ❌ Absente (le modèle `VerificationToken` existe, inutilisé) |

@@ -11,11 +11,13 @@ import { sendBookingDecisionEmails } from "@/lib/mail";
 
 /**
  * Suivi des réservations par l'administration : décision sur une demande en
- * cours de vérification, et enregistrement de l'encaissement en espèces.
+ * cours de vérification, et suivi des espèces.
  *
- * Les paiements de LIUDOR se règlent en liquide, hors ligne. `createPayment`
- * ne déclenche donc aucune transaction bancaire : elle consigne un encaissement
- * qui a déjà eu lieu, avec son montant et l'administrateur qui l'a reçu.
+ * L'argent circule en liquide, hors ligne, et toujours dans le même sens : le
+ * client remet la somme à LIUDOR (`recordCashPayment`), qui la reverse ensuite
+ * au propriétaire (`recordOwnerPayout`). Aucune de ces actions ne déclenche de
+ * transaction bancaire : elles consignent un mouvement qui a déjà eu lieu, avec
+ * son montant et l'administrateur qui l'a fait.
  */
 
 export type BookingActionResult =
@@ -28,9 +30,14 @@ export type BookingActionResult =
     };
 
 const BOOKINGS_PATH = "/admin/reservations";
+const PAYMENTS_PATH = "/admin/paiements";
 
 function revalidateBookings() {
   revalidatePath(BOOKINGS_PATH);
+  // Le détail est une route dynamique : la revalider par son motif touche
+  // toutes les réservations ouvertes, pas seulement la liste.
+  revalidatePath(`${BOOKINGS_PATH}/[id]`, "page");
+  revalidatePath(PAYMENTS_PATH);
   revalidatePath("/admin/dashboard");
   revalidatePath("/reservations");
   revalidatePath("/historique");
@@ -199,7 +206,7 @@ export async function setBookingDecision(
  * existante plutôt que d'échouer sur la contrainte — c'est le cas d'une
  * correction de montant après une saisie erronée.
  */
-export async function createPayment(input: {
+export async function recordCashPayment(input: {
   bookingId: string;
   amount: number;
   /** Compte administrateur ayant reçu les espèces. */
@@ -275,7 +282,7 @@ export async function createPayment(input: {
       },
     });
   } catch (error) {
-    console.error("createPayment a échoué", error);
+    console.error("recordCashPayment a échoué", error);
     return { ok: false, message: "L'enregistrement du paiement a échoué. Réessayez." };
   }
 
@@ -289,4 +296,130 @@ export async function createPayment(input: {
   revalidateBookings();
 
   return { ok: true, message: "Paiement en espèces enregistré." };
+}
+
+/**
+ * Montant reversé au propriétaire.
+ *
+ * Mêmes bornes que l'encaissement : le reversement n'est pas un champ libre de
+ * comptabilité, c'est la contrepartie d'une somme déjà reçue.
+ */
+const payoutSchema = z.object({
+  bookingId: z.string().min(1),
+  amount: z
+    .number({ message: "Saisissez le montant reversé, en dinars." })
+    .positive("Le montant doit être supérieur à zéro.")
+    .max(100_000_000, "Montant improbable : vérifiez la saisie."),
+  recordedBy: z.string().min(1, "Indiquez qui a remis les espèces."),
+});
+
+/**
+ * Enregistre le reversement en espèces au propriétaire.
+ *
+ * Deuxième et dernier mouvement du circuit : LIUDOR rend au propriétaire ce
+ * qu'elle a reçu du client. Le reversement exige donc un encaissement au
+ * préalable — la plateforme ne reverse pas ce qu'elle n'a pas reçu, et une
+ * ligne « reversé » sans encaissement rendrait la caisse illisible.
+ *
+ * Comme l'encaissement, un second enregistrement corrige le précédent plutôt
+ * que d'en créer un autre : une réservation n'a qu'un reversement.
+ */
+export async function recordOwnerPayout(input: {
+  bookingId: string;
+  amount: number;
+  /** Compte administrateur ayant remis les espèces au propriétaire. */
+  recordedBy: string;
+}): Promise<BookingActionResult> {
+  const session = await requireAdminSession();
+  if (!session.ok) return { ok: false, ...session.refusal };
+
+  const parsed = payoutSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Vérifiez les informations du reversement.",
+      fieldErrors: fieldErrorsFrom(parsed.error),
+    };
+  }
+
+  const { bookingId, amount, recordedBy } = parsed.data;
+
+  const [booking, recorder] = await Promise.all([
+    prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        status: true,
+        client: { select: { fullName: true } },
+        payment: { select: { status: true } },
+        room: {
+          select: { name: true, owner: { select: { fullName: true } } },
+        },
+      },
+    }),
+    prisma.user.findFirst({
+      where: { id: recordedBy, role: "ADMIN" },
+      select: { id: true, fullName: true },
+    }),
+  ]);
+
+  if (!booking) {
+    return { ok: false, status: 404, message: "Cette réservation n'existe plus." };
+  }
+
+  if (booking.payment?.status !== "PAID") {
+    return {
+      ok: false,
+      status: 409,
+      message:
+        "Aucun encaissement n'est enregistré sur cette réservation : commencez par enregistrer le paiement du client.",
+    };
+  }
+
+  // Une réservation annulée après encaissement se règle avec le client, pas
+  // avec le propriétaire : la somme lui revient.
+  if (booking.status === "ANNULEE") {
+    return {
+      ok: false,
+      status: 409,
+      message:
+        "Cette réservation est annulée : la somme encaissée doit être rendue au client, pas reversée au propriétaire.",
+    };
+  }
+
+  if (!recorder) {
+    return {
+      ok: false,
+      status: 404,
+      message: "Le compte administrateur indiqué est introuvable.",
+      fieldErrors: { recordedBy: "Choisissez un administrateur de la liste." },
+    };
+  }
+
+  try {
+    await prisma.payment.update({
+      where: { bookingId },
+      data: {
+        payoutAmount: amount,
+        payoutAt: new Date(),
+        payoutRecordedBy: recorder.id,
+      },
+    });
+  } catch (error) {
+    console.error("recordOwnerPayout a échoué", error);
+    return {
+      ok: false,
+      message: "L'enregistrement du reversement a échoué. Réessayez.",
+    };
+  }
+
+  await recordAudit({
+    userId: session.adminId,
+    action: "PAYMENT_PAID_OUT",
+    target: `${booking.room.name} — ${booking.client.fullName}`,
+    detail: `${amount.toLocaleString("fr-DZ")} DA remis à ${booking.room.owner.fullName} par ${recorder.fullName}`,
+  });
+
+  revalidateBookings();
+
+  return { ok: true, message: "Reversement au propriétaire enregistré." };
 }
