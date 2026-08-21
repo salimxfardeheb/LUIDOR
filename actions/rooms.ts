@@ -2,6 +2,11 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import {
+  blockingBookingWhere,
+  slotStatusOf,
+  type BookingHold,
+} from "@/lib/bookings/availability";
 import { formatDate } from "@/lib/format";
 
 /** Durée maximale d'une demande, en jours : au-delà, c'est du cas par cas. */
@@ -48,9 +53,17 @@ export type AvailabilityResult =
   | {
       ok: true;
       available: false;
-      /** Dates déjà prises, formatées pour l'affichage. */
+      /** Dates qui font échouer la vérification, formatées pour l'affichage. */
       unavailableDates: string[];
-      reason: "occupied" | "not-open";
+      /**
+       * - `occupied` : réservation confirmée, ou date fermée par le propriétaire.
+       * - `pending` : une demande retient la date, sans être encore confirmée.
+       * - `not-open` : le propriétaire n'a pas ouvert la date à la réservation.
+       *
+       * `pending` est délibérément distinct d'`occupied` : le client doit
+       * comprendre que la date peut se rouvrir, sans qu'on la lui promette.
+       */
+      reason: "occupied" | "pending" | "not-open";
     }
   | { ok: false; message: string; field?: string };
 
@@ -75,9 +88,13 @@ function eachDay(from: Date, to: Date): Date[] {
  * Vérifie qu'une salle est libre sur une plage de dates.
  *
  * Une date est disponible si elle est ouverte à la réservation (ligne
- * `Availability` en `AVAILABLE`) *et* qu'aucune réservation en cours ne la
- * bloque. Une demande `EN_ATTENTE` ne bloque rien : elle n'est pas encore
- * vérifiée par l'équipe, comme dans la recherche.
+ * `Availability` en `AVAILABLE`) *et* qu'aucune réservation vivante ne la
+ * bloque, au sens de `lib/bookings/availability` — une demande en attente
+ * comprise, tant que son blocage court.
+ *
+ * Cette vérification reste **indicative** : elle est vraie à l'instant où elle
+ * est faite, et rien n'empêche un autre client de déposer sa demande la seconde
+ * suivante. C'est la transaction de `submitBookingRequest` qui tranche.
  */
 export async function checkRoomAvailability(
   formData: FormData
@@ -155,6 +172,8 @@ export async function checkRoomAvailability(
       };
     }
 
+    const now = new Date();
+
     const [availabilities, conflicts] = await Promise.all([
       prisma.availability.findMany({
         where: { roomId, date: { gte: from, lte: to } },
@@ -164,31 +183,56 @@ export async function checkRoomAvailability(
         where: {
           roomId,
           eventDate: { gte: from, lte: to },
-          status: { in: ["EN_COURS_VERIFICATION", "CONFIRMEE"] },
+          ...blockingBookingWhere(now),
         },
-        select: { eventDate: true },
+        select: { eventDate: true, status: true, expiresAt: true },
       }),
     ]);
 
     const statusByDay = new Map(
       availabilities.map((day) => [day.date.toISOString(), day.status])
     );
-    const bookedSet = new Set(
-      conflicts.map((booking) => booking.eventDate.toISOString())
-    );
 
-    // Jour indisponible : bloqué par le propriétaire, ou déjà réservé.
-    const unavailable = days.filter(
+    // Plusieurs réservations peuvent viser la même date — une confirmée et le
+    // reliquat d'une demande, par exemple : c'est leur ensemble qui décide.
+    const holdsByDay = new Map<string, BookingHold[]>();
+    for (const booking of conflicts) {
+      const key = booking.eventDate.toISOString();
+      const holds = holdsByDay.get(key);
+      if (holds) holds.push(booking);
+      else holdsByDay.set(key, [booking]);
+    }
+
+    const slotOf = (day: Date) =>
+      slotStatusOf(holdsByDay.get(day.toISOString()) ?? [], now);
+
+    /*
+     * Trois refus possibles, dans cet ordre de gravité : une date réservée ou
+     * fermée par le propriétaire prime sur une date simplement retenue, qui
+     * prime sur une date jamais ouverte. Annoncer le motif le plus faible
+     * d'abord donnerait un faux espoir sur une plage qui contient un refus ferme.
+     */
+    const occupied = days.filter(
       (day) =>
-        bookedSet.has(day.toISOString()) ||
+        slotOf(day) === "booked" ||
         statusByDay.get(day.toISOString()) === "BLOCKED"
     );
-    if (unavailable.length > 0) {
+    if (occupied.length > 0) {
       return {
         ok: true,
         available: false,
         reason: "occupied",
-        unavailableDates: unavailable.map((day) => formatDate(day)),
+        unavailableDates: occupied.map((day) => formatDate(day)),
+      };
+    }
+
+    const held = days.filter((day) => slotOf(day) === "pending");
+    if (held.length > 0) {
+      return {
+        ok: true,
+        available: false,
+        reason: "pending",
+        unavailableDates: held.map((day) => formatDate(day)),
       };
     }
 

@@ -9,10 +9,12 @@ import {
   CalendarCheck,
   CalendarDays,
   CheckCircle2,
+  Clock,
   Sparkles,
   Users,
 } from "lucide-react";
 import { checkRoomAvailability, type AvailabilityResult } from "@/actions/rooms";
+import { PENDING_SLOT_MESSAGE } from "@/lib/bookings/availability";
 import { BookingRequestModal } from "@/components/rooms/detail/BookingRequestModal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -330,6 +332,23 @@ function ResultMessage({
   const dates = result.unavailableDates;
   const shown = dates.slice(0, 3).join(", ");
   const extra = dates.length > 3 ? ` et ${dates.length - 3} autre(s)` : "";
+
+  /*
+   * Une date retenue par la demande d'un autre client n'est pas une date
+   * perdue : elle se rouvre si cette demande n'aboutit pas. Le dire évite deux
+   * torts symétriques — laisser croire que la salle est libre, et faire
+   * renoncer quelqu'un sur une date qui va peut-être revenir. Aucune promesse
+   * n'est faite pour autant : la demande en cours peut très bien être confirmée.
+   */
+  if (result.reason === "pending") {
+    return (
+      <Feedback tone="warning" icon={Clock}>
+        <strong className="font-semibold">En attente de confirmation</strong> —
+        le {shown}
+        {extra}. {PENDING_SLOT_MESSAGE}
+      </Feedback>
+    );
+  }
 
   return (
     <Feedback tone="warning" icon={AlertCircle}>

@@ -42,6 +42,9 @@ enum BookingStatus {
   EN_COURS_VERIFICATION
   CONFIRMEE
   ANNULEE
+  /// Demande jamais reprise par l'équipe : son blocage a expiré, la date est
+  /// rouverte. Distinct d'`ANNULEE`, qui est une décision.
+  EXPIREE
   CLOTUREE
 }
 
@@ -448,6 +451,10 @@ model Booking {
   contactPhone String
   contactEmail String
   status       BookingStatus @default(EN_ATTENTE)
+  /// Échéance du blocage d'une demande `EN_ATTENTE` : au-delà, la date est
+  /// rouverte même si aucun traitement n'a encore basculé le statut. Remise à
+  /// `null` dès que la demande quitte l'attente — plus rien n'expire alors.
+  expiresAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -460,6 +467,8 @@ model Booking {
   @@index([clientId])
   @@index([roomId])
   @@index([status])
+  /// Recherche du conflit sur une date : c'est la requête du chemin critique.
+  @@index([roomId, eventDate])
   @@map("bookings")
 }
 
@@ -620,6 +629,8 @@ model PlatformSettings {
   address             String?
   /// Délai minimum, en jours, entre une demande et la date de l'événement.
   bookingLeadTimeDays Int      @default(2)
+  /// Durée, en heures, pendant laquelle une demande en attente retient sa date.
+  pendingHoldHours    Int      @default(48)
   /// Un nouvel avis est-il publié sans passer par la modération ?
   reviewAutoPublish   Boolean  @default(true)
   /// Coupe les nouvelles demandes de réservation le temps d'une intervention.

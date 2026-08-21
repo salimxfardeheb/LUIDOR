@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getPlatformSettings } from "@/lib/admin/settings";
+import {
+  BOOKED_SLOT_MESSAGE,
+  PENDING_SLOT_MESSAGE,
+} from "@/lib/bookings/availability";
+import { claimBookingSlot, type ClaimRefusal } from "@/lib/bookings/holds";
 import { parseBookingRequestForm } from "@/lib/bookings/schemas";
 import { formatDate } from "@/lib/format";
 import type { FieldErrors } from "@/lib/forms";
@@ -16,6 +21,12 @@ import { sendBookingRequestEmails } from "@/lib/mail";
  * `EN_ATTENTE` que l'équipe LIUDOR reprend depuis /admin/reservations, puis
  * confirme par téléphone. Le propriétaire n'a rien à traiter — son portail ne
  * montre plus les réservations — d'où l'absence de revalidation côté owner.
+ *
+ * **La demande retient la date.** Tant qu'elle n'a pas expiré, aucun autre
+ * client ne peut en déposer une sur la même salle au même jour : c'est ce qui
+ * empêche l'équipe de rappeler deux personnes pour la même date. Le blocage est
+ * temporaire (`Booking.expiresAt`) — une demande jamais reprise rouvre la date
+ * d'elle-même plutôt que de la geler indéfiniment.
  */
 
 export type BookingRequestResult =
@@ -26,6 +37,12 @@ export type BookingRequestResult =
       fieldErrors?: FieldErrors;
       /** Session absente ou expirée : le formulaire renvoie vers /connexion. */
       needsSignIn?: boolean;
+      /**
+       * La date vient d'être prise ou retenue : le formulaire l'affiche
+       * autrement qu'une erreur de saisie — le client n'a rien à corriger, il a
+       * une autre date à choisir.
+       */
+      conflict?: "pending" | "booked";
     };
 
 /** Minuit UTC du jour courant : `eventDate` est stocké en `@db.Date`. */
@@ -36,8 +53,22 @@ function startOfTodayUtc(): Date {
   );
 }
 
-/** Dates qui occupent réellement un créneau ; une demande n'y suffit pas. */
-const BLOCKING_STATUSES = ["EN_COURS_VERIFICATION", "CONFIRMEE"] as const;
+/** Traduit le refus de la transaction en réponse affichable par le formulaire. */
+function refusal(kind: ClaimRefusal): BookingRequestResult {
+  if (kind === "duplicate") {
+    return {
+      ok: false,
+      message:
+        "Vous avez déjà une demande en attente sur cette salle à cette date. L'équipe LIUDOR vous rappelle sous 24 h ouvrées.",
+    };
+  }
+
+  return {
+    ok: false,
+    conflict: kind,
+    message: kind === "pending" ? PENDING_SLOT_MESSAGE : BOOKED_SLOT_MESSAGE,
+  };
+}
 
 export async function submitBookingRequest(
   formData: FormData
@@ -150,50 +181,14 @@ export async function submitBookingRequest(
       };
     }
 
-    const [blocking, duplicate] = await Promise.all([
-      prisma.booking.findFirst({
-        where: {
-          roomId: room.id,
-          eventDate,
-          status: { in: [...BLOCKING_STATUSES] },
-        },
-        select: { id: true },
-      }),
-      prisma.booking.findFirst({
-        where: {
-          roomId: room.id,
-          eventDate,
-          clientId: session.user.id,
-          status: "EN_ATTENTE",
-        },
-        select: { id: true },
-      }),
-    ]);
-
-    if (blocking) {
-      return {
-        ok: false,
-        message: "Vérifiez les informations saisies.",
-        fieldErrors: {
-          eventDate:
-            "Cette date est déjà retenue sur cette salle. Choisissez-en une autre.",
-        },
-      };
-    }
-
-    if (duplicate) {
-      return {
-        ok: false,
-        message:
-          "Vous avez déjà une demande en attente sur cette salle à cette date. L'équipe LIUDOR vous rappelle sous 24 h ouvrées.",
-      };
-    }
-
     /*
      * Seules les prestations réellement proposées par cette salle sont retenues.
      * Le filtre se fait en base, sur le rattachement : un identifiant forgé, ou
      * celui d'une prestation retirée depuis l'affichage de la page, est ignoré
      * plutôt que de faire échouer la demande — le client n'y peut rien.
+     *
+     * Lecture pure, sortie de la transaction : elle ne dispute la date à
+     * personne et n'a donc pas à tenir le verrou pendant son aller-retour.
      */
     const offered =
       serviceIds.length === 0
@@ -203,21 +198,22 @@ export async function submitBookingRequest(
             select: { serviceId: true, service: { select: { name: true } } },
           });
 
-    await prisma.booking.create({
+    const outcome = await claimBookingSlot({
+      roomId: room.id,
+      eventDate,
+      isoEventDate: parsed.data.eventDate,
+      clientId: session.user.id,
+      holdHours: settings.pendingHoldHours,
       data: {
-        clientId: session.user.id,
-        roomId: room.id,
         eventType,
-        eventDate,
         guestsCount,
         contactPhone,
         contactEmail,
-        status: "EN_ATTENTE",
-        services: {
-          create: offered.map((link) => ({ serviceId: link.serviceId })),
-        },
+        serviceIds: offered.map((link) => link.serviceId),
       },
     });
+
+    if (!outcome.ok) return refusal(outcome.kind);
 
     // Best-effort : un SMTP absent ou en échec est loggé, jamais bloquant — la
     // demande est déjà en base, l'équipe la voit dans son tableau de bord.

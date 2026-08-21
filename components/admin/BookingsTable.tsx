@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { AdminBookingRow } from "@/lib/admin/bookings";
 import { BookingDecisionActions } from "@/components/admin/BookingDecisionActions";
+import { BookingHold } from "@/components/admin/BookingHold";
 import { PaymentStageBadge } from "@/components/admin/PaymentStageBadge";
 import {
   ADMIN_ROW_ACTION,
@@ -132,7 +133,18 @@ export function BookingsTable({ bookings }: { bookings: AdminBookingRow[] }) {
                   )}
                 </td>
                 <td className="py-3 pr-4">
-                  <BookingStatusBadge status={booking.status} />
+                  <span className="flex flex-col items-start gap-1">
+                    <BookingStatusBadge status={booking.status} />
+                    {/*
+                      Le badge dit l'état, pas l'urgence : une demande en
+                      attente retient une date, et ce blocage a une fin.
+                    */}
+                    <BookingHold
+                      status={booking.status}
+                      expiresAt={booking.expiresAt}
+                      createdAt={booking.createdAt}
+                    />
+                  </span>
                 </td>
                 <td className="py-3 pr-4">
                   <PaymentStageBadge payment={booking.payment} />
@@ -201,6 +213,12 @@ function BookingCard({ booking }: { booking: AdminBookingRow }) {
         <div className="flex flex-wrap items-center gap-2">
           <BookingStatusBadge status={booking.status} />
           <PaymentStageBadge payment={booking.payment} />
+          <BookingHold
+            status={booking.status}
+            expiresAt={booking.expiresAt}
+            createdAt={booking.createdAt}
+            className="basis-full"
+          />
         </div>
       </div>
 

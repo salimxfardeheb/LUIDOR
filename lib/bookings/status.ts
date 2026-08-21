@@ -39,6 +39,12 @@ export const BOOKING_STATUS_MAP: Record<BookingStatus, BookingStatusConfig> = {
     variant: "error",
     description: "Cette réservation a été annulée.",
   },
+  EXPIREE: {
+    label: "Expirée",
+    variant: "neutral",
+    description:
+      "La demande n'a pas été confirmée à temps : la date est de nouveau ouverte.",
+  },
   CLOTUREE: {
     label: "Clôturée",
     variant: "neutral",
@@ -52,10 +58,18 @@ export const BOOKING_STATUSES = [
   "EN_COURS_VERIFICATION",
   "CONFIRMEE",
   "ANNULEE",
+  "EXPIREE",
   "CLOTUREE",
 ] as const satisfies readonly BookingStatus[];
 
-/** Réservations encore vivantes : elles occupent une date au calendrier. */
+/**
+ * Réservations encore vivantes : elles occupent une date au calendrier.
+ *
+ * Attention : `EN_ATTENTE` n'y figure que sous condition d'échéance. Ce tableau
+ * décrit les statuts, pas la disponibilité — pour savoir si une date est
+ * réellement prise, passer par `lib/bookings/availability`, qui tient compte de
+ * `expiresAt`. Il sert à l'index unique partiel et aux listes d'écran.
+ */
 export const ACTIVE_BOOKING_STATUSES = [
   "EN_ATTENTE",
   "EN_COURS_VERIFICATION",
@@ -66,6 +80,7 @@ export const ACTIVE_BOOKING_STATUSES = [
 export const PAST_BOOKING_STATUSES = [
   "CLOTUREE",
   "ANNULEE",
+  "EXPIREE",
 ] as const satisfies readonly BookingStatus[];
 
 export function isBookingStatus(value: string): value is BookingStatus {

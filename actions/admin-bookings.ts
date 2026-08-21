@@ -118,10 +118,11 @@ const paymentSchema = z.object({
  *
  * Une confirmation ferme la date, dans la même transaction que le statut.
  *
- * L'annulation ne rouvre pas la date : le propriétaire l'avait peut-être fermée
- * avant la demande, et la rouvrir d'office déciderait à sa place. Un clic sur
- * son calendrier suffit à la libérer, plus aucune réservation confirmée ne la
- * verrouille.
+ * L'annulation libère le blocage de la réservation, mais ne rouvre pas pour
+ * autant la ligne `Availability` : le propriétaire avait peut-être fermé la
+ * date avant la demande, et la rouvrir d'office déciderait à sa place. La date
+ * redevient donc demandable si — et seulement si — le propriétaire la proposait
+ * déjà. Un clic sur son calendrier suffit dans le cas contraire.
  */
 export async function setBookingDecision(
   bookingId: string,
@@ -168,22 +169,43 @@ export async function setBookingDecision(
 
   const confirmed = decision === "CONFIRMEE";
 
+  let applied = false;
+
   try {
     // Transaction : une date confirmée mais restée ouverte serait réservable
     // deux fois. Les deux écritures passent ensemble ou pas du tout.
-    await prisma.$transaction(async (tx) => {
-      await tx.booking.update({
-        where: { id: parsed.data },
-        data: { status: decision },
+    applied = await prisma.$transaction(async (tx) => {
+      /*
+       * `updateMany` filtré sur le statut, et non `update` par identifiant : la
+       * lecture ci-dessus date d'un aller-retour réseau, et la demande peut
+       * avoir expiré entre-temps. Le garde-fou est alors dans la clause `WHERE`
+       * — donc évalué par la base, au moment de l'écriture — plutôt que dans un
+       * `if` applicatif qui juge un état déjà périmé.
+       *
+       * `expiresAt` repasse à `null` : la demande quitte l'attente, plus rien
+       * n'a à expirer. Une décision ne se défait pas toute seule.
+       */
+      const { count } = await tx.booking.updateMany({
+        where: { id: parsed.data, status: { in: [...OPEN_STATUSES] } },
+        data: { status: decision, expiresAt: null },
       });
 
-      if (!confirmed) return;
-
-      await closeRoomDate(tx, booking.roomId, booking.eventDate);
+      if (count === 0) return false;
+      if (confirmed) await closeRoomDate(tx, booking.roomId, booking.eventDate);
+      return true;
     });
   } catch (error) {
     console.error("setBookingDecision a échoué", error);
     return { ok: false, message: "La mise à jour a échoué. Réessayez." };
+  }
+
+  if (!applied) {
+    return {
+      ok: false,
+      status: 409,
+      message:
+        "Cette réservation n'est plus ouverte : elle vient d'être traitée ou son blocage a expiré. Actualisez la page.",
+    };
   }
 
   await recordAudit({
@@ -208,13 +230,18 @@ export async function setBookingDecision(
   });
 
   revalidateBookings();
-  if (confirmed) revalidateRoomAvailability(booking.roomId);
+  /*
+   * Les deux décisions changent la disponibilité, pas seulement la
+   * confirmation : depuis que la demande en attente retient sa date, l'annuler
+   * la rouvre — et les calendriers qui l'affichaient occupée doivent le voir.
+   */
+  revalidateRoomAvailability(booking.roomId);
 
   return {
     ok: true,
     message: confirmed
       ? "Réservation confirmée : la date est fermée dans le calendrier de la salle."
-      : "Réservation annulée.",
+      : "Réservation annulée : la date est de nouveau proposée aux clients.",
   };
 }
 
@@ -241,7 +268,7 @@ export async function startBookingVerification(
 
   const booking = await prisma.booking.findUnique({
     where: { id: parsed.data },
-    select: { status: true },
+    select: { status: true, roomId: true },
   });
 
   if (!booking) {
@@ -258,16 +285,32 @@ export async function startBookingVerification(
   }
 
   try {
-    await prisma.booking.update({
-      where: { id: parsed.data },
-      data: { status: "EN_COURS_VERIFICATION" },
+    /*
+     * `expiresAt: null` : le blocage cesse d'être à durée limitée dès qu'un
+     * humain suit le dossier. C'est bien la date qui reste tenue — ce statut
+     * fait partie des blocages fermes — mais plus rien ne la rouvrira sans
+     * décision.
+     */
+    const { count } = await prisma.booking.updateMany({
+      where: { id: parsed.data, status: "EN_ATTENTE" },
+      data: { status: "EN_COURS_VERIFICATION", expiresAt: null },
     });
+
+    if (count === 0) {
+      return {
+        ok: false,
+        status: 409,
+        message:
+          "Cette demande n'est plus en attente : elle vient d'être traitée ou son blocage a expiré. Actualisez la page.",
+      };
+    }
   } catch (error) {
     console.error("startBookingVerification a échoué", error);
     return { ok: false, message: "La mise à jour a échoué. Réessayez." };
   }
 
   revalidateBookings();
+  revalidateRoomAvailability(booking.roomId);
 
   return {
     ok: true,
@@ -388,7 +431,7 @@ export async function recordCashPayment(input: {
 
       await tx.booking.update({
         where: { id: bookingId },
-        data: { status: "CONFIRMEE" },
+        data: { status: "CONFIRMEE", expiresAt: null },
       });
       await closeRoomDate(tx, booking.roomId, booking.eventDate);
     });

@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { blockingBookingWhere } from "@/lib/bookings/availability";
 import {
   ROOM_SUMMARY_SELECT,
   toRoomSummary,
@@ -20,15 +21,6 @@ export interface RoomsPage {
 }
 
 const EMPTY_PAGE: RoomsPage = { rooms: [], total: 0, page: 1, pageCount: 0 };
-
-/**
- * Réservations qui rendent une salle indisponible à une date donnée. Une demande
- * `EN_ATTENTE` ne bloque rien : elle n'est pas encore vérifiée par l'équipe.
- */
-const BLOCKING_BOOKING_STATUSES = [
-  "EN_COURS_VERIFICATION",
-  "CONFIRMEE",
-] satisfies Prisma.EnumBookingStatusFilter["in"];
 
 const ORDER_BY: Record<SortKey, Prisma.RoomOrderByWithRelationInput[]> = {
   // À défaut de score de pertinence, les salles les plus récentes d'abord.
@@ -114,10 +106,13 @@ function buildWhere(filters: RoomFilters): Prisma.RoomWhereInput {
       gte: toUtcDate(filters.date),
       lte: toUtcDate(filters.dateFin ?? filters.date),
     };
+    // Une demande en attente compte comme occupée tant que son blocage court :
+    // proposer une salle que le visiteur ne pourra pas demander est un résultat
+    // faux. La règle vient de `lib/bookings/availability`, comme partout.
     conditions.push({
       availabilities: { none: { date: period, status: "BLOCKED" } },
       bookings: {
-        none: { eventDate: period, status: { in: BLOCKING_BOOKING_STATUSES } },
+        none: { eventDate: period, ...blockingBookingWhere(new Date()) },
       },
     });
   }

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { blockingBookingWhere } from "@/lib/bookings/availability";
 import {
   type CalendarMonthRef,
   type OwnerCalendarDay,
@@ -12,13 +13,6 @@ import {
  * module restent en UTC, comme le formatage de `lib/format`. Un décalage de
  * fuseau ferait glisser une journée entière.
  */
-
-/** Réservations qui occupent réellement une date dans le calendrier. */
-const ACTIVE_BOOKING_STATUSES = [
-  "EN_ATTENTE",
-  "EN_COURS_VERIFICATION",
-  "CONFIRMEE",
-] as const;
 
 export function isoDay(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -57,18 +51,22 @@ export async function getOwnerRoomWindow(
   const from = new Date(Date.UTC(first.year, first.month - 1, 1));
   const to = new Date(Date.UTC(last.year, last.month, 1));
 
+  const now = new Date();
+
   const [availabilities, bookings] = await Promise.all([
     prisma.availability.findMany({
       where: { roomId, date: { gte: from, lt: to } },
       select: { date: true, status: true },
     }),
+    // Même règle que la fiche publique : un blocage échu n'occupe plus rien, et
+    // le propriétaire retrouve la main sur la date sans attendre un traitement.
     prisma.booking.findMany({
       where: {
         roomId,
         eventDate: { gte: from, lt: to },
-        status: { in: [...ACTIVE_BOOKING_STATUSES] },
+        ...blockingBookingWhere(now),
       },
-      select: { eventDate: true, status: true },
+      select: { eventDate: true, status: true, expiresAt: true },
     }),
   ]);
 
@@ -81,6 +79,8 @@ export async function getOwnerRoomWindow(
 
   // Une réservation confirmée verrouille la date ; une demande encore en
   // instruction est seulement signalée, le propriétaire garde la main dessus.
+  // La requête ne ramène déjà que des réservations qui bloquent : un blocage
+  // échu n'apparaît ni dans l'un ni dans l'autre ensemble.
   const bookedDays = new Set<string>();
   const requestedDays = new Set<string>();
   for (const booking of bookings) {

@@ -58,6 +58,13 @@ export function BookingRequestModal({
 }) {
   const [pending, setPending] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  /**
+   * Date prise ou retenue pendant la saisie. Distingué de `error` : ce n'est
+   * pas une faute du client, et le ton du message n'est pas le même.
+   */
+  const [conflict, setConflict] = React.useState<"pending" | "booked" | null>(
+    null
+  );
   const [fieldErrors, setFieldErrors] = React.useState<FieldErrors>({});
   const [sentDate, setSentDate] = React.useState<string | null>(null);
 
@@ -66,6 +73,7 @@ export function BookingRequestModal({
   React.useEffect(() => {
     if (!open) return;
     setError(null);
+    setConflict(null);
     setFieldErrors({});
     setSentDate(null);
   }, [open]);
@@ -85,6 +93,7 @@ export function BookingRequestModal({
     event.preventDefault();
     setPending(true);
     setError(null);
+    setConflict(null);
     setFieldErrors({});
 
     const formData = new FormData(event.currentTarget);
@@ -105,6 +114,18 @@ export function BookingRequestModal({
         window.location.href = `/connexion?callbackUrl=${encodeURIComponent(
           `/salles/${roomId}`
         )}`;
+        return;
+      }
+
+      /*
+       * Le serveur a refusé parce que la date vient d'être prise, alors qu'elle
+       * était libre à l'ouverture du formulaire. Rien à corriger dans la
+       * saisie : le message est présenté comme une information sur la date, et
+       * la saisie est conservée pour qu'il suffise d'en changer.
+       */
+      if (result.conflict) {
+        setConflict(result.conflict);
+        setError(result.message);
         return;
       }
 
@@ -158,7 +179,21 @@ export function BookingRequestModal({
             confirmé la date.
           </Alert>
 
-          {error && <Alert variant="error">{error}</Alert>}
+          {error &&
+            (conflict ? (
+              <Alert
+                variant="warning"
+                title={
+                  conflict === "pending"
+                    ? "En attente de confirmation"
+                    : "Date déjà réservée"
+                }
+              >
+                {error} Choisissez une autre date pour poursuivre.
+              </Alert>
+            ) : (
+              <Alert variant="error">{error}</Alert>
+            ))}
 
           <FormField
             id="resa-eventType"

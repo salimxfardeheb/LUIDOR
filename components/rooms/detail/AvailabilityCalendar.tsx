@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { SLOT_STATUS_LABELS } from "@/lib/bookings/availability";
 import { formatDate, formatMonthYear } from "@/lib/format";
 import type { CalendarMonth, DayStatus } from "@/lib/rooms/detail";
 import { cn } from "@/lib/utils";
@@ -15,10 +16,14 @@ const DOT_CLASSES: Record<DayStatus, string> = {
   closed: "bg-gray-200",
 };
 
+/**
+ * Les trois premiers libellés viennent de `lib/bookings/availability` : le
+ * calendrier, la vérification de disponibilité et le refus du serveur nomment
+ * ainsi le même état de la même façon. « En attente » tout court laissait
+ * penser à un retard d'affichage plutôt qu'à une date retenue par quelqu'un.
+ */
 const STATUS_LABEL: Record<DayStatus, string> = {
-  available: "disponible",
-  booked: "réservé",
-  pending: "en attente",
+  ...SLOT_STATUS_LABELS,
   closed: "non ouvert à la réservation",
 };
 
@@ -122,16 +127,26 @@ export function AvailabilityCalendar({ months }: { months: CalendarMonth[] }) {
       </div>
 
       <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-gray-100 pt-3 text-xs text-gray-500">
-        {(["available", "booked", "pending"] as DayStatus[]).map((status) => (
+        {(["available", "pending", "booked"] as DayStatus[]).map((status) => (
           <li key={status} className="flex items-center gap-1.5">
             <span
               aria-hidden
               className={cn("h-2 w-2 rounded-full", DOT_CLASSES[status])}
             />
-            <span className="capitalize">{STATUS_LABEL[status]}</span>
+            <span className="first-letter:capitalize">{STATUS_LABEL[status]}</span>
           </li>
         ))}
       </ul>
+
+      {/*
+        La légende nomme l'état, elle n'explique pas ce qu'il implique : une
+        date orange n'est pas perdue, elle est retenue par une demande que
+        l'équipe n'a pas encore tranchée.
+      */}
+      <p className="mt-2 text-xs leading-relaxed text-gray-500">
+        Une date en attente est retenue par la demande d&apos;un autre client :
+        elle redeviendra disponible si cette demande n&apos;est pas confirmée.
+      </p>
     </section>
   );
 }

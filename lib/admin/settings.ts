@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { DEFAULT_PENDING_HOLD_HOURS } from "@/lib/bookings/availability";
 
 /**
  * Réglages de la plateforme.
@@ -19,6 +20,14 @@ export interface PlatformSettingsData {
   address: string | null;
   /** Délai minimum, en jours, entre une demande et la date de l'événement. */
   bookingLeadTimeDays: number;
+  /**
+   * Durée, en heures, pendant laquelle une demande en attente retient sa date.
+   *
+   * Lue à la seule création de la demande, qui fige l'échéance obtenue dans
+   * `Booking.expiresAt` : modifier ce réglage n'allonge ni ne raccourcit les
+   * blocages déjà en cours.
+   */
+  pendingHoldHours: number;
   /** Un nouvel avis part-il en ligne sans passer par la modération ? */
   reviewAutoPublish: boolean;
   /** Coupe les nouvelles demandes de réservation le temps d'une intervention. */
@@ -34,6 +43,7 @@ export const DEFAULT_SETTINGS: PlatformSettingsData = {
   contactPhone: null,
   address: null,
   bookingLeadTimeDays: 2,
+  pendingHoldHours: DEFAULT_PENDING_HOLD_HOURS,
   reviewAutoPublish: true,
   maintenanceMode: false,
   updatedAt: null,
@@ -53,6 +63,7 @@ export async function getPlatformSettings(): Promise<PlatformSettingsData> {
     contactPhone: settings.contactPhone,
     address: settings.address,
     bookingLeadTimeDays: settings.bookingLeadTimeDays,
+    pendingHoldHours: settings.pendingHoldHours,
     reviewAutoPublish: settings.reviewAutoPublish,
     maintenanceMode: settings.maintenanceMode,
     updatedAt: settings.updatedAt.toISOString(),

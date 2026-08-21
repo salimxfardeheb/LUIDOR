@@ -1,5 +1,9 @@
 import { PrismaClient, type Prisma, type RateUnit } from "@prisma/client";
 import {
+  DEFAULT_PENDING_HOLD_HOURS,
+  holdExpiryFrom,
+} from "../../lib/bookings/availability";
+import {
   hasEquipment,
   SUMMARY_EQUIPMENTS,
 } from "../../lib/rooms/equipments";
@@ -681,9 +685,15 @@ async function main() {
       )
     );
 
-    // Les trois premières salles portent des réservations de démonstration :
-    // une confirmée et une en cours de vérification, que le calendrier de la
-    // fiche affiche respectivement en « réservé » et « en attente ».
+    /*
+     * Les trois premières salles portent des réservations de démonstration, une
+     * par état visible du calendrier : confirmée (« réservée »), en cours de
+     * vérification et en attente (« en attente de confirmation »).
+     *
+     * Trois dates distinctes, et c'est nécessaire : l'index unique partiel
+     * `bookings_active_slot_key` interdit deux réservations vivantes sur la
+     * même salle au même jour.
+     */
     if (index < 3) {
       await prisma.booking.create({
         data: {
@@ -707,6 +717,21 @@ async function main() {
           contactPhone: "0555 11 11 1" + index,
           contactEmail: clients[(index + 1) % clients.length].email,
           status: "EN_COURS_VERIFICATION",
+        },
+      });
+      // Demande en attente, blocage encore actif : c'est elle qui rend la date
+      // orange sur la fiche et interdit à un autre client de la demander.
+      await prisma.booking.create({
+        data: {
+          clientId: clients[(index + 2) % clients.length].id,
+          roomId: created.id,
+          eventType: room.category,
+          eventDate: addDays(startDate, 28 + index),
+          guestsCount: demoGuests(room),
+          contactPhone: "0555 22 22 2" + index,
+          contactEmail: clients[(index + 2) % clients.length].email,
+          status: "EN_ATTENTE",
+          expiresAt: holdExpiryFrom(new Date(), DEFAULT_PENDING_HOLD_HOURS),
         },
       });
     }

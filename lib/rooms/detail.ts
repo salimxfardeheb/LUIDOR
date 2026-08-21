@@ -1,5 +1,11 @@
 import type { Prisma, RateUnit } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  blockingBookingWhere,
+  slotStatusOf,
+  type BookingHold,
+  type SlotStatus,
+} from "@/lib/bookings/availability";
 import { hasEquipment, SUMMARY_EQUIPMENTS } from "@/lib/rooms/equipments";
 import {
   ROOM_SUMMARY_SELECT,
@@ -332,7 +338,14 @@ export async function getSimilarRooms(
   return [...sameCategory, ...fallback].map(toRoomSummary);
 }
 
-export type DayStatus = "available" | "booked" | "pending" | "closed";
+/**
+ * État d'une case du mini calendrier.
+ *
+ * Reprend les trois états de `lib/bookings/availability` et y ajoute `closed` :
+ * une date que le propriétaire n'a jamais ouverte n'est pas indisponible, elle
+ * n'est simplement pas proposée.
+ */
+export type DayStatus = SlotStatus | "closed";
 
 export interface CalendarDay {
   /** Date au format `YYYY-MM-DD`. */
@@ -381,9 +394,9 @@ export async function getRoomCalendar(
       where: {
         roomId,
         eventDate: { gte: from, lt: to },
-        status: { in: ["EN_ATTENTE", "EN_COURS_VERIFICATION", "CONFIRMEE"] },
+        ...blockingBookingWhere(now),
       },
-      select: { eventDate: true, status: true },
+      select: { eventDate: true, status: true, expiresAt: true },
     }),
   ]);
 
@@ -396,13 +409,23 @@ export async function getRoomCalendar(
     );
   }
 
-  // Une réservation prime sur la disponibilité : confirmée = réservé, en cours
-  // de vérification ou en attente = en attente.
+  /*
+   * Une réservation prime sur la disponibilité déclarée. Le regroupement par
+   * jour est nécessaire : `slotStatusOf` doit voir toutes les réservations
+   * d'une même date d'un coup pour que la confirmée l'emporte sur l'attente,
+   * quel que soit l'ordre de lecture.
+   */
+  const holdsByDay = new Map<string, BookingHold[]>();
   for (const booking of bookings) {
-    statusByDay.set(
-      isoDay(booking.eventDate),
-      booking.status === "CONFIRMEE" ? "booked" : "pending"
-    );
+    const key = isoDay(booking.eventDate);
+    const holds = holdsByDay.get(key);
+    if (holds) holds.push(booking);
+    else holdsByDay.set(key, [booking]);
+  }
+
+  for (const [day, holds] of Array.from(holdsByDay.entries())) {
+    const slot = slotStatusOf(holds, now);
+    if (slot !== "available") statusByDay.set(day, slot);
   }
 
   return Array.from({ length: monthCount }, (_, offset) => {

@@ -1,6 +1,7 @@
 import type { BookingStatus, PaymentStatus, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { bookingAmount } from "@/lib/bookings/amount";
+import { expireStaleHolds } from "@/lib/bookings/holds";
 import type { BookingAdminFilters } from "@/lib/admin/bookings-params";
 
 /**
@@ -36,6 +37,12 @@ export interface AdminBookingRow {
   guestsCount: number;
   /** Date de la demande, au format ISO. */
   createdAt: string;
+  /**
+   * Échéance du blocage de la date, au format ISO ; `null` hors attente.
+   * Affichée à côté du statut : c'est le temps qu'il reste pour rappeler le
+   * client avant que la date ne se rouvre aux autres.
+   */
+  expiresAt: string | null;
   clientId: string;
   clientName: string;
   clientEmail: string;
@@ -172,6 +179,16 @@ function orderFromSort(
 export async function listAdminBookings(
   filters: BookingAdminFilters
 ): Promise<AdminBookingRow[]> {
+  /*
+   * Balayage des blocages échus avant de lire.
+   *
+   * La disponibilité n'en dépend pas — elle est déjà exacte sans ce passage,
+   * qui ne fait que remettre le statut d'accord avec les faits. Sans cron dans
+   * l'infrastructure du projet, c'est ici que le ménage se fait : au moment où
+   * quelqu'un regarde la liste, donc là où un statut faux se verrait.
+   */
+  await expireStaleHolds();
+
   const bookings = await prisma.booking.findMany({
     where: whereFromFilters(filters),
     orderBy: orderFromSort(filters.sort),
@@ -183,6 +200,7 @@ export async function listAdminBookings(
       guestsCount: true,
       contactPhone: true,
       createdAt: true,
+      expiresAt: true,
       client: {
         select: { id: true, fullName: true, email: true, avatarUrl: true },
       },
@@ -207,6 +225,7 @@ export async function listAdminBookings(
     eventDate: booking.eventDate.toISOString().slice(0, 10),
     guestsCount: booking.guestsCount,
     createdAt: booking.createdAt.toISOString(),
+    expiresAt: booking.expiresAt?.toISOString() ?? null,
     clientId: booking.client.id,
     clientName: booking.client.fullName,
     clientEmail: booking.client.email,
@@ -284,6 +303,8 @@ export interface AdminBookingDetail {
   contactPhone: string;
   contactEmail: string;
   createdAt: string;
+  /** Échéance du blocage de la date, au format ISO ; `null` hors attente. */
+  expiresAt: string | null;
   updatedAt: string;
   /** Montant attendu au tarif de la salle (base + ménage). */
   expectedAmount: number;
@@ -357,6 +378,7 @@ export async function getAdminBookingDetail(
       contactPhone: true,
       contactEmail: true,
       createdAt: true,
+      expiresAt: true,
       updatedAt: true,
       payment: { select: paymentSelect },
       services: {
@@ -450,6 +472,7 @@ export async function getAdminBookingDetail(
     contactPhone: booking.contactPhone,
     contactEmail: booking.contactEmail,
     createdAt: booking.createdAt.toISOString(),
+    expiresAt: booking.expiresAt?.toISOString() ?? null,
     updatedAt: booking.updatedAt.toISOString(),
     expectedAmount: bookingAmount(
       undefined,
