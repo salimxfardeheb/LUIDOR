@@ -1,9 +1,4 @@
 import type { Metadata } from "next";
-import { AboutContact } from "@/components/about/AboutContact";
-import { AboutHero } from "@/components/about/AboutHero";
-import { AboutMission } from "@/components/about/AboutMission";
-import { AboutStory } from "@/components/about/AboutStory";
-import { AboutVerification } from "@/components/about/AboutVerification";
 
 // Route /a-propos — page institutionnelle, contenu entièrement statique
 // (lib/about/content.ts) : aucune requête, la page est prérendue au build.
@@ -28,11 +23,6 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <>
-      <AboutHero />
-      <AboutMission />
-      <AboutStory />
-      <AboutVerification />
-      <AboutContact />
     </>
   );
 }
