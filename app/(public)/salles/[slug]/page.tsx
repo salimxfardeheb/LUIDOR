@@ -8,7 +8,10 @@ import {
   servicePriceLabel,
   type ChipItem,
 } from "@/components/rooms/detail/ChipGrid";
-import { LocationCard } from "@/components/rooms/detail/LocationCard";
+import {
+  LocationCard,
+  LocationCardSkeleton,
+} from "@/components/rooms/detail/LocationCard";
 import { OwnerCard } from "@/components/rooms/detail/OwnerCard";
 import { PracticalInfo } from "@/components/rooms/detail/PracticalInfo";
 import { RateTable } from "@/components/rooms/detail/RateTable";
@@ -27,6 +30,7 @@ import {
   SIMILAR_ROOMS_COUNT,
   type RoomDetail,
 } from "@/lib/rooms/detail";
+import { resolveRoomLocation } from "@/lib/rooms/geocode";
 import { equipmentIcon, serviceIcon } from "@/lib/rooms/icons";
 import { formatCapacity } from "@/lib/format";
 
@@ -188,14 +192,11 @@ export default async function Page({ params }: PageProps) {
               <RoomCalendarSection roomId={room.id} />
             </Suspense>
 
-            <LocationCard
-              name={room.name}
-              address={room.address}
-              district={room.district}
-              city={room.city}
-              latitude={room.latitude}
-              longitude={room.longitude}
-            />
+            {/* La carte attend parfois un géocodage : hors du rendu initial,
+                comme le calendrier, pour ne pas retarder la fiche. */}
+            <Suspense fallback={<LocationCardSkeleton />}>
+              <RoomLocationSection room={room} />
+            </Suspense>
           </div>
         </aside>
       </div>
@@ -268,6 +269,22 @@ async function RoomCalendarSection({ roomId }: { roomId: string }) {
     console.error("[fiche salle] chargement du calendrier", error);
     return null;
   }
+}
+
+async function RoomLocationSection({ room }: { room: RoomDetail }) {
+  // `resolveRoomLocation` ne lève pas : au pire elle renvoie `null`, et la
+  // carte affiche son cadre neutre.
+  const location = await resolveRoomLocation(room);
+
+  return (
+    <LocationCard
+      name={room.name}
+      address={room.address}
+      district={room.district}
+      city={room.city}
+      location={location}
+    />
+  );
 }
 
 async function SimilarRoomsSection({ room }: { room: RoomDetail }) {

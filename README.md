@@ -117,7 +117,7 @@ Envoi d'une copie des messages du formulaire `/contact` à l'équipe. **Tant que
 
 ## Base de données
 
-Le schéma vit dans [`prisma/schema.prisma`](prisma/schema.prisma) — 24 modèles et 8 énumérations, tous commentés.
+Le schéma vit dans [`prisma/schema.prisma`](prisma/schema.prisma) — 25 modèles et 8 énumérations, tous commentés.
 
 ### Modèles principaux
 
@@ -138,7 +138,7 @@ Le schéma vit dans [`prisma/schema.prisma`](prisma/schema.prisma) — 24 modèl
 
 ### Migrations
 
-Seize migrations versionnées dans [`prisma/migrations/`](prisma/migrations/), de `20260803205007_init` à `20260820170000_room_rates`.
+Dix-neuf migrations versionnées dans [`prisma/migrations/`](prisma/migrations/), de `20260803205007_init` à `20260820200000_booking_services`.
 
 ```bash
 npm run db:migrate      # applique les migrations et régénère le client
@@ -372,13 +372,13 @@ Les composants de [`components/ui/`](components/ui/) sont la seule source de vé
 
 ### Limites connues
 
-Un audit complet a été mené le 6 août 2026 : **[`AUDIT-CODE-LIUDOR.md`](AUDIT-CODE-LIUDOR.md)**. Les points à traiter avant toute mise en production :
+Un audit technique complet a été mené le 20 août 2026, avec un suivi des corrections au 21 : **[`AUDIT.md`](AUDIT.md)**. Les points à traiter avant toute mise en production :
 
 | Réf. | Limite |
 | --- | --- |
 | **C-1** | Vérifier que `NEXTAUTH_SECRET` n'est pas resté à une valeur d'exemple — forge de JWT `ADMIN` sinon |
 | **H-1** | La session JWT de 30 jours **n'est pas révocable** : suspendre un compte ou rétrograder un administrateur reste sans effet jusqu'à l'expiration du token. Changer son mot de passe ne déconnecte pas les autres sessions. |
-| **H-2** | Huit pages `/admin/*` ne revérifient pas le rôle côté serveur et reposent sur le seul middleware |
+| **H-2** | Aucune contrainte n'empêche deux réservations confirmées sur la même salle à la même date — ni en base, ni dans les deux chemins de confirmation (décision manuelle, encaissement). C'est le point le plus urgent du dossier. |
 | **H-3** | Aucune limitation de débit sur la connexion, l'inscription et le formulaire de contact |
 | **H-4** | Aucun en-tête de sécurité HTTP (CSP, HSTS, X-Frame-Options) |
 | **H-5** | `npm audit` remonte 8 vulnérabilités de dépendances, dont 6 hautes |
@@ -404,8 +404,8 @@ Catalogue public avec recherche, filtres et pagination · fiche salle détaillé
 
 | Sujet | État |
 | --- | --- |
-| **Création de réservation par un client** | ❌ Non implémentée. Les réservations visibles proviennent du seed. Toute la chaîne aval (statuts, paiements, avis) est en place et attend ce maillon. |
-| Réglages `maintenanceMode` et `bookingLeadTimeDays` | ⚠️ Configurables et persistés, mais **jamais appliqués** — ils dépendent de la création de réservation |
+| **Clôture des réservations** | ❌ Aucun code ne fait passer une réservation en `CLOTUREE` après la date de l'événement : tant qu'il manque cette tâche, aucun client ne peut déposer d'avis. Le reste du cycle fonctionne — demande, prise en charge, confirmation (automatique à l'encaissement), annulation. |
+| Réglages `maintenanceMode` et `bookingLeadTimeDays` | ⚠️ Lus et appliqués par `submitBookingRequest`, mais **modifiables nulle part** : aucun chemin d'écriture sur `PlatformSettings` dans le dépôt |
 | Modération des avis, réglages de la plateforme, catalogue et journal de sécurité | ❌ Retirés de l'administration lors du recentrage du portail. Les données restent en base ; `reviewAutoPublish` et `bookingLeadTimeDays` ne sont plus éditables depuis l'interface. |
 | Page `/proprietaires/[id]` | ⚠️ Maquette vide, publique |
 | Mot de passe oublié | ❌ Absent |
